@@ -31,4 +31,4 @@ This is a web-based implementation of the popular Turkish game show "Bir Kelime 
 
 - Game concept inspired by the Turkish TV show "Bir Kelime Bir İşlem"
 - Word list sourced from [Kelimetre](https://www.kelimetre.com/)
-- Math solving algorithm developed with the assistance of Claude, an AI assistant created by Anthropic
+- Math solving algorithm developed with the assistance of [Claude](https://claude.ai/), an AI assistant created by Anthropic
