@@ -1,1154 +1,269 @@
-const wordButton = document.getElementById("wordButton");
-const mathButton = document.getElementById("mathButton");
-const gameArea = document.getElementById("game-area");
-const timerElement = document.getElementById("timer");
-const actionButtons = document.getElementById("action-buttons");
-const foundButton = document.getElementById("foundButton");
-const hintButton = document.getElementById("hintButton");
-const answerButton = document.getElementById("answerButton");
-const gameButtons = document.getElementById("game-buttons");
-const inGameButtons = document.getElementById("in-game-buttons");
-const homeButton = document.getElementById("homeButton");
-const playAgainButton = document.getElementById("playAgainButton");
-
-const letters = "ABCÇDEFGĞHIİJKLMNOÖPRSŞTUÜVYZ";
-const joker = "?";
-
-if (
-  !wordButton ||
-  !mathButton ||
-  !gameArea ||
-  !timerElement ||
-  !actionButtons ||
-  !foundButton ||
-  !hintButton ||
-  !answerButton ||
-  !gameButtons ||
-  !inGameButtons ||
-  !homeButton ||
-  !playAgainButton
-) {
-  console.error(
-    "Bir veya daha fazla HTML elementi bulunamadı. Lütfen element ID'lerini kontrol edin."
-  );
-} else {
-  wordButton.addEventListener(
-    "click",
-    () => !isGameStarting && !isGameActive && startGame("word")
-  );
-  mathButton.addEventListener(
-    "click",
-    () => !isGameStarting && !isGameActive && startGame("math")
-  );
-  foundButton.addEventListener("click", () => isGameActive && stopTimer());
-  hintButton.addEventListener("click", () => isGameActive && showHint());
-  answerButton.addEventListener("click", showAnswer);
-  homeButton.addEventListener("click", () => !isGameStarting && goToHomePage());
-  playAgainButton.addEventListener(
-    "click",
-    () => !isGameStarting && restartGame()
-  );
-}
-
-let timer;
-let timeLeft = 30;
-let gameType = "";
-let currentNumbers = [];
-let currentTarget = 0;
-let animationCount = 0;
-let totalAnimations = 9;
-let isGameStarting = false;
-let isGameActive = false;
-let startTimerTimeout;
-
-async function startGame(type) {
-  if (isGameStarting || isGameActive) {
-    return;
-  }
-  isGameStarting = true;
-  isGameActive = false;
-
-  gameType = type;
-  timeLeft = 30;
-  clearInterval(timer);
-  clearTimeout(startTimerTimeout);
-
-  if (timerElement) {
-    timerElement.textContent = timeLeft;
-    timerElement.style.display = "block";
-    timerElement.style.color = "";
-  }
-  if (actionButtons) actionButtons.style.display = "block";
-  if (foundButton) foundButton.disabled = true;
-  if (hintButton) hintButton.disabled = true;
-  if (answerButton) answerButton.disabled = true;
-  if (gameArea) gameArea.innerHTML = "";
-
-  if (gameButtons) gameButtons.style.display = "none";
-  if (inGameButtons) inGameButtons.style.display = "block";
-
-  animationCount = 0;
-  totalAnimations = type === "word" ? 9 : 7;
-
-  if (type === "word") {
-    await loadWordList();
-    await createWordGame();
-  } else {
-    createMathGame();
-  }
-
-  startTimerTimeout = setTimeout(() => {
-    startTimer();
-    if (foundButton) foundButton.disabled = false;
-    if (hintButton) hintButton.disabled = false;
-    if (answerButton) answerButton.disabled = false;
-    isGameStarting = false;
-    isGameActive = true;
-  }, (totalAnimations + 1) * 300);
-}
-
-function goToHomePage() {
-  if (isGameStarting) return;
-
-  clearInterval(timer);
-  clearTimeout(startTimerTimeout);
-  gameArea.innerHTML = "";
-  actionButtons.style.display = "none";
-  inGameButtons.style.display = "none";
-  gameButtons.style.display = "block";
-  timerElement.style.color = "";
-  timerElement.textContent = "30";
-  timerElement.style.display = "block";
-  answerButton.textContent = "CEVAP";
-  timeLeft = 30;
-  isGameStarting = false;
-  isGameActive = false;
-
-  const paginationArea = document.getElementById("pagination-area");
-  if (paginationArea) paginationArea.remove();
-
-  const answerArea = document.getElementById("answer-area");
-  if (answerArea) answerArea.remove();
-}
-
-function restartGame() {
-  if (isGameStarting) return;
-
-  clearInterval(timer);
-  clearTimeout(startTimerTimeout);
-  isGameStarting = false;
-  isGameActive = false;
-
-  const answerArea = document.getElementById("answer-area");
-  if (answerArea) {
-    answerArea.style.display = "none";
-  }
-  if (answerButton) {
-    answerButton.textContent = "CEVAP";
-  }
-
-  setTimeout(() => {
-    startGame(gameType);
-  }, 100);
-}
-
-function generateLetters() {
-  const letterCount = 8;
-  const generatedLetters = [];
-  for (let i = 0; i < letterCount; i++) {
-    generatedLetters.push(letters[Math.floor(Math.random() * letters.length)]);
-  }
-  generatedLetters.push(joker);
-  return generatedLetters;
-}
-
-function generateNumbers() {
-  const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 25, 50, 75, 100];
-  const generatedNumbers = [];
-
-  for (let i = 0; i < 4; i++) {
-    const index = Math.floor(Math.random() * 10);
-    generatedNumbers.push(numbers[index]);
-  }
-
-  for (let i = 0; i < 2; i++) {
-    const index = Math.floor(Math.random() * 4) + 10;
-    generatedNumbers.push(numbers[index]);
-  }
-
-  return generatedNumbers.sort(() => Math.random() - 0.5);
-}
-
-const vowels = "AEIİOÖUÜ";
-const consonants = "BCÇDFGĞHJKLMNPRSŞTVYZ";
-
-const consonantFrequency = {
-  B: 2, C: 1, Ç: 1, D: 1, F: 1, G: 1, Ğ: 1, H: 1, J: 1, K: 5,
-  L: 3, M: 3, N: 3, P: 1, R: 1, S: 3, Ş: 1, T: 1, V: 1, Y: 2, Z: 1
-};
-
-const vowelFrequency = {
-  A: 8, E: 9, I: 5, İ: 7, O: 3, Ö: 1, U: 3, Ü: 2
-};
-
-function getWeightedLetter(isVowel) {
-  const frequency = isVowel ? vowelFrequency : consonantFrequency;
-  const totalWeight = Object.values(frequency).reduce((a, b) => a + b, 0);
-  let random = Math.floor(Math.random() * totalWeight);
-  for (let [letter, weight] of Object.entries(frequency)) {
-    if (random < weight) return letter;
-    random -= weight;
-  }
-}
-
-function startTimer() {
-  clearInterval(timer);
-  timeLeft = 30;
-  updateTimer();
-  timer = setInterval(updateTimer, 1000);
-}
-
-function animateLetterOrNumber(element, finalContent, isWord) {
-  const chars = isWord ? "ABCÇDEFGĞHIİJKLMNOÖPRSŞTUÜVYZ" : "0123456789";
-  let iterations = 0;
-  const interval = setInterval(() => {
-    element.textContent = chars[Math.floor(Math.random() * chars.length)];
-    iterations++;
-    if (iterations === 15) {
-      clearInterval(interval);
-      element.textContent = finalContent;
-      animationCount++;
-      if (animationCount === totalAnimations + 1) {
-        startTimer();
+let wordButton=document.getElementById("wordButton"),mathButton=document.getElementById("mathButton"),gameArea=document.getElementById("game-area"),timerElement=document.getElementById("timer"),actionButtons=document.getElementById("action-buttons"),hintButton=document.getElementById("hintButton"),answerButton=document.getElementById("answerButton"),gameButtons=(answerButton&&answerButton.addEventListener("click",handleAnswerButton),document.getElementById("game-buttons")),inGameButtons=document.getElementById("in-game-buttons"),homeButton=document.getElementById("homeButton"),playAgainButton=(homeButton&&homeButton.addEventListener("click",function(){var e;isPaused&&(isPaused=!1,e=document.getElementById("paused-overlay"))&&(e.style.display="none"),isGameStarting||goToHomePage()}),document.getElementById("playAgainButton")),letters=(playAgainButton&&playAgainButton.addEventListener("click",function(){var e;isPaused&&(isPaused=!1,e=document.getElementById("paused-overlay"))&&(e.style.display="none"),isGameStarting||restartGame()}),"ABCÇDEFGĞHIİJKLMNOÖPRSŞTUÜVYZ"),joker="?",timerInterval=(wordButton&&mathButton&&gameArea&&timerElement&&actionButtons&&hintButton&&answerButton&&gameButtons&&inGameButtons&&homeButton&&playAgainButton?(wordButton.addEventListener("click",()=>!isGameStarting&&!isGameActive&&startGame("word")),mathButton.addEventListener("click",()=>!isGameStarting&&!isGameActive&&startGame("math")),hintButton.addEventListener("click",()=>isGameActive&&showHint()),answerButton.addEventListener("click",showAnswer),homeButton.addEventListener("click",()=>!isGameStarting&&goToHomePage()),playAgainButton.addEventListener("click",()=>!isGameStarting&&restartGame())):console.error("Bir veya daha fazla HTML elementi bulunamadı. Lütfen element ID'lerini kontrol edin."),null),timeLeft=30,gameType="",currentNumbers=[],currentTarget=0,animationCount=0,totalAnimations=9,isGameStarting=!1,isGameActive=!1,startTimerTimeout,isPaused=!1,soundEnabled=!0,volumeLevel=70,countdownMusicPlaying=!1,calculationSteps=[],currentSelectedNumber=null,currentOperator=null,usedNumbers=[],isProcessingWordCheck=!1,isProcessingMathCheck=!1,isShowingHint=!1,isProcessingUndoAction=!1,isProcessingClearAction=!1,activeIntervals=[],activeTasks={pauseTimer:!1},gameState={timeLeft:30,musicPosition:0,isAnswerDisplayed:!1};function setupGameButtons(){var e,t=document.getElementById("wordButton"),n=document.getElementById("mathButton"),a=document.getElementById("homeButton"),i=document.getElementById("playAgainButton"),o=document.getElementById("hintButton");t&&(e=t.cloneNode(!0),t.parentNode.replaceChild(e,t),e.addEventListener("click",()=>!isGameStarting&&!isGameActive&&startGame("word"))),n&&(t=n.cloneNode(!0),n.parentNode.replaceChild(t,n),t.addEventListener("click",()=>!isGameStarting&&!isGameActive&&startGame("math"))),a&&(e=a.cloneNode(!0),a.parentNode.replaceChild(e,a),e.addEventListener("click",()=>{var e;isPaused&&(isPaused=!1,(e=document.getElementById("pauseButton"))&&(e.innerHTML='<i class="fas fa-pause"></i>',e.title="Duraklat",e.classList.remove("play-active")),e=document.getElementById("paused-overlay"))&&(e.style.display="none"),isGameStarting||goToHomePage()})),i&&(n=i.cloneNode(!0),i.parentNode.replaceChild(n,i),n.addEventListener("click",()=>{var e;isPaused&&(isPaused=!1,(e=document.getElementById("pauseButton"))&&(e.innerHTML='<i class="fas fa-pause"></i>',e.title="Duraklat",e.classList.remove("play-active")),e=document.getElementById("paused-overlay"))&&(e.style.display="none"),isGameStarting||restartGame()})),o&&(t=o.cloneNode(!0),o.parentNode.replaceChild(t,o),t.addEventListener("click",()=>isGameActive&&showHint()))}function handleAnswerButton(){isGameStarting||(isGameActive?openConfirmationModal:toggleAnswerDisplay)()}function toggleAnswerDisplay(){let e=document.getElementById("answer-area");var t;e?"block"===e.style.display?(e.style.display="none",answerButton&&(answerButton.innerHTML='<i class="fas fa-eye"></i> CEVAP'),(t=document.getElementById("pagination-area"))&&(t.style.display="none")):(("word"===gameType?fillWordAnswers:fillMathAnswers)(e),e.style.display="block",answerButton&&(answerButton.innerHTML='<i class="fas fa-eye-slash"></i> CEVABI GİZLE'),(t=document.getElementById("pagination-area"))&&(t.style.display="block")):((e=document.createElement("div")).id="answer-area",gameArea.appendChild(e),("word"===gameType?fillWordAnswers:fillMathAnswers)(e),e.style.display="block",answerButton&&(answerButton.innerHTML='<i class="fas fa-eye-slash"></i> CEVABI GİZLE'))}function openConfirmationModal(){var e,t=document.getElementById("confirmation-modal");t&&(isGameActive&&(clearActiveTimers(),e=document.getElementById("countdownMusic"))&&countdownMusicPlaying&&(e.pause(),gameState.musicPosition=e.currentTime),t.style.display="flex")}function blurGameArea(t){var n=document.querySelectorAll("#game-area > *, #word-input-area, #math-input-area");if(t){n.forEach(e=>{e.style.filter="blur(5px)",e.style.pointerEvents="none"});t=document.createElement("style");t.id="disable-selection-style",t.textContent=`
+      body {
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+      }
+    `,document.head.appendChild(t);let e=document.getElementById("paused-overlay");e||((e=document.createElement("div")).id="paused-overlay",e.innerHTML='<div class="paused-text">DURAKLADI</div>',document.querySelector(".container").appendChild(e)),e.style.display="flex";t=document.getElementById("in-game-buttons");t&&(t.style.position="relative",t.style.zIndex="1000",t.querySelectorAll("button").forEach(e=>{e.style.pointerEvents="auto"}))}else{n.forEach(e=>{e.style.filter="",e.style.pointerEvents="auto"});t=document.getElementById("disable-selection-style"),n=(t&&t.remove(),document.getElementById("paused-overlay")),t=(n&&(n.style.display="none"),document.getElementById("in-game-buttons"));t&&(t.style.position="",t.style.zIndex="")}}function updateSoundIcon(){var e=document.getElementById("soundToggleButton"),t=e.querySelector("i");e&&t&&(soundEnabled?(t.className="fas fa-volume-up",t.classList.remove("sound-muted")):(t.className="fas fa-volume-mute",t.classList.add("sound-muted")))}function toggleSound(){soundEnabled=!soundEnabled,updateSoundIcon();var e=document.getElementById("countdownMusic");if(e)if(soundEnabled){if(e.volume=volumeLevel/100,isGameActive)try{e.paused&&countdownMusicPlaying?e.play().catch(e=>console.error("Müzik başlatma hatası:",e)):countdownMusicPlaying||startCountdownMusic()}catch(e){console.error("Müzik oynatma hatası:",e)}void 0!==playSound.sounds&&Object.values(playSound.sounds).forEach(e=>{e.volume=volumeLevel/100})}else void(e.volume=0)!==playSound.sounds&&Object.values(playSound.sounds).forEach(e=>{e.volume=0});else console.error("Müzik elementi bulunamadı!")}function startCountdownMusic(){let e=document.getElementById("countdownMusic");if(e){if(soundEnabled&&isGameActive)try{e.volume=volumeLevel/100,e.currentTime=0;var t=e.play();void 0!==t&&t.then(()=>{countdownMusicPlaying=!0,e.onended=function(){countdownMusicPlaying=!1,isGameActive&&0<timeLeft&&(timeLeft=0,timerElement&&(timerElement.textContent=timeLeft),handleTimeExpiration())}}).catch(e=>{console.error("Müzik çalma hatası:",e),countdownMusicPlaying=!1})}catch(e){console.error("Müzik başlatma hatası:",e)}}else console.error("countdown müzik elementi bulunamadı!")}function stopCountdownMusic(){var e=document.getElementById("countdownMusic");if(e)try{e.pause(),e.currentTime=0,countdownMusicPlaying=!1}catch(e){console.error("Müzik durdurma hatası:",e)}else console.error("countdown müzik elementi bulunamadı!")}function setupWordInputArea(){var e=document.getElementById("word-form");let t=document.getElementById("word-answer");var n,a=document.getElementById("check-word-button"),i=document.getElementById("word-result");e&&t&&a&&i&&(n=e.cloneNode(!0),e.parentNode.replaceChild(n,e),(e=document.createElement("button")).id="check-word-button",e.type="submit",e.textContent="Kontrol Et",a.parentNode.replaceChild(e,a),i.innerHTML="",i.style.display="none",t.value="",setTimeout(()=>{t.focus()},100),n.addEventListener("submit",function(e){e.preventDefault(),isProcessingWordCheck||(t.value=turkishToUpperCase(t.value),checkWordAnswer())}),e.addEventListener("click",function(e){e.preventDefault(),isProcessingWordCheck||(t.value=turkishToUpperCase(t.value),checkWordAnswer())}),t.addEventListener("input",function(){var e,t=turkishToUpperCase(this.value);t!==this.value&&(e=this.selectionStart,this.value=t,this.setSelectionRange(e,e))}))}function turkishToUpperCase(e){if(!e)return"";let t={i:"İ","İ":"İ","ı":"I",I:"I","ö":"Ö","Ö":"Ö","ü":"Ü","Ü":"Ü","ş":"Ş","Ş":"Ş","ğ":"Ğ","Ğ":"Ğ","ç":"Ç","Ç":"Ç"};return e.split("").map(e=>void 0!==t[e]?t[e]:e.toUpperCase()).join("")}function checkWordAnswer(){var e,t,n;isProcessingWordCheck||(isProcessingWordCheck=!0,closeHintNotification(),e=document.getElementById("word-answer"),t=document.getElementById("word-result"),e&&t?0===(t=turkishToUpperCase(e.value.trim())).length?(showNotification("Lütfen bir kelime girin.","warning"),isProcessingWordCheck=!1):t.length<4?(showNotification("En az 4 harfli bir kelime girmelisiniz.","warning"),isProcessingWordCheck=!1):(n=document.querySelectorAll(".letter-box"),canFormWord(t,Array.from(n).map(e=>e.textContent),!0)?checkWordInList(t):(showNotification(`"${t}" verilen harflerle oluşturulamaz.`,"error"),playSound("wrong")),e.value="",setTimeout(()=>{isProcessingWordCheck=!1},500)):isProcessingWordCheck=!1)}function checkWordInList(e){window.wordList&&Array.isArray(window.wordList)?window.wordList.includes(e)?(showNotification(`Tebrikler! "${e}" geçerli bir kelime.`,"success"),playSound("correct"),evaluateUserWord(e)):(showNotification(`"${e}" Türkçe sözlükte bulunamadı.`,"warning"),playSound("wrong")):showNotification(`"${e}" harflerle eşleşiyor, ancak sözlük kontrolü yapılamadı.`,"warning")}async function evaluateUserWord(e){var t=document.querySelectorAll(".letter-box"),t=Array.from(t).map(e=>e.textContent),n=await findLongestWord(t,!1),t=await findLongestWord(t,!0),e=e.length,n=n.length;e===t.length?(showNotification("MÜKEMMELSİN! En uzun kelimeyi buldun!","success"),isGameActive&&endGame(!0,!0)):e===n?showNotification("Harika! Jokersiz en uzun kelimeyi buldun!","success"):showNotification(.8*n<=e?"Çok iyi gidiyorsun! Daha uzun kelimeler de var!":4<=e?"İyi bir kelime! Daha uzunları da mümkün.":"Doğru kelime, devam et!","info")}function showNotification(e,t){notificationSystem.init(),notificationSystem.show(e,t,"hint"===t?5e3:3e3)}function showWordResult(e,t){let n=document.getElementById("word-result");n&&(n.classList.remove("result-correct","result-warning","result-error"),n.classList.add("result-"+t),n.innerHTML=e,n.style.display="block","error"!==t)&&setTimeout(()=>{n.style.display="none"},6e3)}function playSound(e){if(soundEnabled&&(void 0===playSound.sounds&&(playSound.sounds={correct:new Audio("sounds/correct.mp3")||new Audio,wrong:new Audio("sounds/wrong.mp3")||new Audio},Object.values(playSound.sounds).forEach(e=>{e.volume=volumeLevel/100})),playSound.sounds[e]))try{playSound.sounds[e].currentTime=0,playSound.sounds[e].play().catch(e=>console.log("Ses çalma hatası:",e))}catch(e){console.log("Ses çalma hatası:",e)}}function setupMathInputArea(){var e=document.getElementById("math-input-area");let n=document.getElementById("available-numbers");var t=document.querySelectorAll(".operator-button"),a=document.getElementById("undo-button"),i=document.getElementById("clear-button"),o=document.getElementById("check-calculation-button"),r=document.getElementById("calculation-steps"),s=document.getElementById("current-calculation"),l=document.getElementById("math-result");e&&n&&(n.innerHTML="",r&&(r.innerHTML=""),s&&(s.innerHTML=""),l&&(l.innerHTML="",l.style.display="none"),calculationSteps=[],currentSelectedNumber=null,currentOperator=null,usedNumbers=[],currentNumbers.forEach(e=>{var t=document.createElement("button");t.className="number-button",t.textContent=e,t.dataset.value=e,t.setAttribute("aria-label","Sayı "+e),n.appendChild(t)}),r&&((e=document.createElement("div")).className="target-info",e.innerHTML=`<span>Hedef: <strong>${currentTarget}</strong></span>`,r.appendChild(e)),n.querySelectorAll(".number-button").forEach(e=>{var t=e.cloneNode(!0);e.parentNode.replaceChild(t,e),t.addEventListener("click",function(){this.classList.contains("used")||selectNumber(parseInt(this.dataset.value),this)}),t.addEventListener("mouseenter",function(){this.classList.contains("used")||this.classList.add("hover")}),t.addEventListener("mouseleave",function(){this.classList.remove("hover")})}),t.forEach(e=>{var t=e.cloneNode(!0);e.parentNode.replaceChild(t,e),t.addEventListener("click",function(){selectOperator(this.getAttribute("data-op"))}),t.addEventListener("mouseenter",function(){null!==currentSelectedNumber&&this.classList.add("operator-hover")}),t.addEventListener("mouseleave",function(){this.classList.remove("operator-hover")})}),a&&(s=a.cloneNode(!0),a.parentNode.replaceChild(s,a),s.addEventListener("click",function(){isProcessingUndoAction||undoLastStep()})),i&&(l=i.cloneNode(!0),i.parentNode.replaceChild(l,i),l.addEventListener("click",function(){isProcessingClearAction||clearCalculation()})),o&&(r=o.cloneNode(!0),o.parentNode.replaceChild(r,o),r.addEventListener("click",function(){!isProcessingMathCheck&&0<calculationSteps.length&&checkMathAnswer()}),r.disabled=0===calculationSteps.length),showGuideMessage("Bir sayı seçin, sonra bir işlem seçin, ardından başka bir sayı seçin."))}function showGuideMessage(e,t=!0){let n=document.getElementById("math-result");n&&(n.classList.remove("result-correct","result-warning","result-error"),n.classList.add("result-guide"),n.innerHTML='<i class="fas fa-info-circle"></i> '+e,n.style.display="block",t)&&setTimeout(()=>{n.style.display="none"},5e3)}function selectNumber(e,t){if(closeHintNotification(),!t.classList.contains("used")){if(null===currentSelectedNumber)currentSelectedNumber=e,t.classList.add("selected"),showGuideMessage("Şimdi bir işlem seçin (+, -, ×, ÷)");else if(null!==currentSelectedNumber&&null===currentOperator){var n;for(n of document.querySelectorAll(".number-button"))if(n.classList.contains("selected")){n.classList.remove("selected");break}currentSelectedNumber=e,t.classList.add("selected"),showGuideMessage("Şimdi bir işlem seçin (+, -, ×, ÷)")}else if(null!==currentSelectedNumber&&null!==currentOperator){var a,i=calculateStep(currentSelectedNumber,e,currentOperator);if(!1!==i){for(a of document.querySelectorAll(".number-button"))if(a.classList.contains("selected")){a.classList.remove("selected"),a.classList.add("used"),usedNumbers.push(a);break}t.classList.add("used"),usedNumbers.push(t),calculationSteps.push({leftNumber:currentSelectedNumber,rightNumber:e,operator:currentOperator,result:i});document.querySelectorAll(".operator-button").forEach(e=>{e.classList.remove("selected")});t=document.createElement("button"),e=(t.className="number-button result-button",t.textContent=i,t.dataset.value=i,t.setAttribute("aria-label","Sonuç: "+i),t.addEventListener("click",function(){selectNumber(parseInt(this.dataset.value),this)}),t.addEventListener("mouseenter",function(){this.classList.contains("used")||this.classList.contains("selected")||this.classList.add("hover")}),t.addEventListener("mouseleave",function(){this.classList.remove("hover")}),document.getElementById("available-numbers")),e=(e&&e.appendChild(t),currentSelectedNumber=null,currentOperator=null,playSound("correct"),0===Math.abs(i-currentTarget)?showGuideMessage("Hedef sayıya ulaştınız! Kontrol Et butonuna basabilirsiniz.",!1):showGuideMessage("Harika! Şimdi bir sonraki işleme başlayabilirsiniz."),document.getElementById("check-calculation-button"));e&&(e.disabled=!1)}}updateCalculationDisplay()}}function selectOperator(e){closeHintNotification(),null===currentSelectedNumber?showGuideMessage("Önce bir sayı seçmelisiniz!",!0):(document.querySelectorAll(".operator-button").forEach(e=>{e.classList.remove("selected")}),currentOperator=(currentOperator,e),(e=document.querySelector(`.operator-button[data-op="${e}"]`))&&e.classList.add("selected"),showGuideMessage("Şimdi ikinci sayıyı seçin"),updateCalculationDisplay())}function clearButton_onClick(){if(null!==currentSelectedNumber){var e;for(e of document.querySelectorAll(".number-button"))e.classList.contains("selected")&&e.classList.remove("selected");document.querySelectorAll(".operator-button").forEach(e=>{e.classList.remove("selected")}),currentSelectedNumber=null,currentOperator=null,updateCalculationDisplay(),showGuideMessage("İşlem iptal edildi. Yeni bir sayı seçin.")}else!isProcessingClearAction&&0<calculationSteps.length&&clearCalculation()}function updateCalculationDisplay(){let i=document.getElementById("calculation-steps");var t=document.getElementById("current-calculation");if(i&&t){if(0<calculationSteps.length){let e=i.querySelector(".target-info");e||((e=document.createElement("div")).className="target-info",e.innerHTML=`<span>Hedef: <strong>${currentTarget}</strong></span>`),i.innerHTML="",i.appendChild(e),calculationSteps.forEach((e,t)=>{var n=document.createElement("div"),a=(n.className="step",displayOperator(e.operator));n.innerHTML=e.leftNumber+` ${a} ${e.rightNumber} = `+e.result,t===calculationSteps.length-1&&n.classList.add("last-step"),i.appendChild(n)})}if(null!==currentSelectedNumber){let e=""+currentSelectedNumber;null!==currentOperator&&(e+=" "+displayOperator(currentOperator)),t.innerHTML=e}else t.innerHTML=""}}function calculateStep(e,t,n){switch(n){case"+":return e+t;case"-":return e<t?(showMathResult(e+` - ${t} hesaplaması negatif sonuç veriyor.`,"warning"),!1):e-t;case"*":return e*t;case"/":return 0===t?(showMathResult("Sıfıra bölme işlemi yapılamaz!","error"),!1):e%t!=0?(showMathResult(e+` sayısı ${t} sayısına tam bölünmüyor.`,"warning"),!1):e/t;default:return!1}}function undoLastStep(){if(!isProcessingUndoAction&&0!==calculationSteps.length){var e;isProcessingUndoAction=!0,closeHintNotification(),null===currentSelectedNumber&&null===currentOperator||(document.querySelectorAll(".number-button").forEach(e=>{e.classList.contains("selected")&&e.classList.remove("selected")}),document.querySelectorAll(".operator-button").forEach(e=>{e.classList.remove("selected")}),currentSelectedNumber=null,currentOperator=null,updateCalculationDisplay(),showGuideMessage("Mevcut işlem iptal edildi. Şimdi son adımı geri alabilirsiniz.")),calculationSteps.pop();let n=document.getElementById("available-numbers");n&&(n.innerHTML=""),usedNumbers=[],currentSelectedNumber=null,currentOperator=null,currentNumbers.forEach(e=>{var t=document.createElement("button");t.className="number-button",t.textContent=e,t.dataset.value=e,t.addEventListener("click",function(){selectNumber(parseInt(this.dataset.value),this)}),t.setAttribute("aria-label","Sayı "+e),t.addEventListener("mouseenter",function(){this.classList.contains("used")||this.classList.contains("selected")||this.classList.add("hover")}),t.addEventListener("mouseleave",function(){this.classList.remove("hover")}),n.appendChild(t)});for(e of calculationSteps){var t=findOrCreateButton(e.leftNumber),t=(t&&(t.classList.add("used"),usedNumbers.push(t)),findOrCreateButton(e.rightNumber)),t=(t&&(t.classList.add("used"),usedNumbers.push(t)),document.createElement("button"));t.className="number-button result-button",t.textContent=e.result,t.dataset.value=e.result,t.addEventListener("click",function(){selectNumber(parseInt(this.dataset.value),this)}),t.addEventListener("mouseenter",function(){this.classList.contains("used")||this.classList.contains("selected")||this.classList.add("hover")}),t.addEventListener("mouseleave",function(){this.classList.remove("hover")}),n.appendChild(t)}updateCalculationDisplay(),playSound("wrong"),0===calculationSteps.length?showGuideMessage("Tüm adımlar geri alındı. Baştan başlayabilirsiniz."):showGuideMessage("Son adım geri alındı. Devam edebilirsiniz."),setTimeout(()=>{isProcessingUndoAction=!1},300)}}function findOrCreateButton(e){var t,n=document.getElementById("available-numbers");for(t of n.querySelectorAll(".number-button:not(.used)"))if(parseInt(t.dataset.value)===e)return t;var a=document.createElement("button");return a.className="number-button",a.textContent=e,a.dataset.value=e,a.addEventListener("click",function(){selectNumber(parseInt(this.dataset.value),this)}),n.appendChild(a),a}function clearCalculation(){isProcessingClearAction||(isProcessingClearAction=!0,closeHintNotification(),null!==currentSelectedNumber||null!==currentOperator?(document.querySelectorAll(".number-button").forEach(e=>{e.classList.contains("selected")&&e.classList.remove("selected")}),document.querySelectorAll(".operator-button").forEach(e=>{e.classList.remove("selected")}),currentSelectedNumber=null,currentOperator=null,showGuideMessage("Mevcut işlem iptal edildi. Yeni bir işleme başlayabilirsiniz."),updateCalculationDisplay(),playSound("wrong")):(calculationSteps=[],usedNumbers=[],currentSelectedNumber=null,currentOperator=null,setupMathInputArea(),playSound("wrong"),showGuideMessage("Tüm hesaplama sıfırlandı. Baştan başlayabilirsiniz.")),setTimeout(()=>{isProcessingClearAction=!1},300))}function updateCalculationDisplay(){var e=document.getElementById("calculation-steps"),t=document.getElementById("current-calculation");if(e&&t){if(0<calculationSteps.length){let a="";calculationSteps.forEach((e,t)=>{var n=displayOperator(e.operator);a+=`<div class="step">${e.leftNumber} ${n} ${e.rightNumber} = ${e.result}</div>`}),e.innerHTML=a}else e.innerHTML="";if(null!==currentSelectedNumber){let e=""+currentSelectedNumber;null!==currentOperator&&(e+=" "+displayOperator(currentOperator)),t.innerHTML=e}else t.innerHTML=""}}function displayOperator(e){switch(e){case"+":return"+";case"-":return"−";case"*":return"×";case"/":return"÷";default:return e}}function checkMathAnswer(){if(!isProcessingMathCheck){isProcessingMathCheck=!0,closeHintNotification();let e=null;var t;null===(e=0<calculationSteps.length?calculationSteps[calculationSteps.length-1].result:e)?(showNotification("Henüz bir hesaplama yapmadınız.","warning"),isProcessingMathCheck=!1):(0===(t=Math.abs(e-currentTarget))?(showNotification(`<i class="fas fa-check-circle"></i> Tebrikler! Hedef sayı ${currentTarget}'a ulaştınız!`,"success"),playSound("correct"),isGameActive&&endGame(!0,!0)):showNotification(`Sonucunuz: ${e} (Hedef sayıdan ${t} uzaktasınız)`,"warning"),setTimeout(()=>{isProcessingMathCheck=!1},500))}}function addPlayButtonStyles(){var e=document.createElement("style");e.textContent=`
+    #pauseButton.play-active {
+      background-color: #00cc66;
+      transform: scale(1.1);
+      box-shadow: 0 0 8px rgba(0, 204, 102, 0.6);
+      animation: pulse-play 1.5s infinite;
+    }
+    
+    @keyframes pulse-play {
+      0% {
+        transform: scale(1.1);
+        box-shadow: 0 0 8px rgba(0, 204, 102, 0.6);
+      }
+      50% {
+        transform: scale(1.15);
+        box-shadow: 0 0 12px rgba(0, 204, 102, 0.8);
+      }
+      100% {
+        transform: scale(1.1);
+        box-shadow: 0 0 8px rgba(0, 204, 102, 0.6);
       }
     }
-  }, 100);
-}
-
-async function createWordGame() {
-  let letters = [];
-  let vowelCount = 0;
-
-  const vowelDistribution = Math.random();
-  if (vowelDistribution < 0.62) {
-    vowelCount = 3;
-  } else if (vowelDistribution < 0.92) {
-    vowelCount = 4;
-  } else {
-    vowelCount = 5;
-  }
-
-  for (let i = 0; i < vowelCount; i++) {
-    letters.push(getWeightedLetter(true));
-  }
-
-  while (letters.length < 8) {
-    letters.push(getWeightedLetter(false));
-  }
-
-  letters = letters.sort(() => Math.random() - 0.5);
-
-  letters.push(joker);
-
-  if (gameArea) {
-    const lettersContainer = document.createElement("div");
-    lettersContainer.id = "letters-container";
-    gameArea.appendChild(lettersContainer);
-
-    animationCount = 0;
-    letters.forEach((letter, index) => {
-      setTimeout(() => {
-        const letterBox = document.createElement("div");
-        letterBox.className = "letter-box";
-        letterBox.style.opacity = "0";
-        lettersContainer.appendChild(letterBox);
-
-        setTimeout(() => {
-          letterBox.style.opacity = "1";
-          animateLetterOrNumber(letterBox, letter, true);
-        }, 50);
-      }, index * 300);
-    });
-  }
-}
-
-async function findLongestWord(letters, useJoker = false) {
-  const availableLetters = letters.slice();
-  const jokerIndex = availableLetters.indexOf('?');
-  
-  if (!window.wordList || window.wordList.length === 0) {
-      await loadWordList();
-  }
-  
-  return window.wordList
-      .filter(word => canFormWord(word, availableLetters, useJoker))
-      .reduce((longest, current) => current.length > longest.length ? current : longest, '');
-}
-
-function canFormWord(word, availableLetters, useJoker) {
-  const lettersCopy = availableLetters.slice();
-  const jokerIndex = lettersCopy.indexOf('?');
-  let jokerUsed = false;
-
-  for (let char of word) {
-      const index = lettersCopy.indexOf(char);
-      if (index !== -1) {
-          lettersCopy[index] = null;
-      } else if (useJoker && !jokerUsed && jokerIndex !== -1) {
-          lettersCopy[jokerIndex] = null;
-          jokerUsed = true;
-      } else {
-          return false;
+  `,document.head.appendChild(e)}function addStylesForMathInput(){var e=document.createElement("style");e.textContent=`
+    .target-info {
+      background-color: rgba(255, 204, 0, 0.2);
+      padding: 8px;
+      border-radius: 5px;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+    
+    .target-info strong {
+      font-size: 1.2em;
+      color: #ffcc00;
+    }
+    
+    .step {
+      position: relative;
+      padding-left: 20px;
+    }
+    
+    .step::before {
+      content: "→";
+      position: absolute;
+      left: 0;
+      color: #0099cc;
+    }
+    
+    .last-step {
+      font-weight: bold;
+      background-color: rgba(0, 204, 102, 0.15);
+    }
+    
+    .number-button.hover {
+      background-color: #e6f7ff;
+      transform: scale(1.05);
+      box-shadow: 0 0 5px rgba(0, 153, 204, 0.5);
+    }
+    
+    .number-button.result-button {
+      background-color: #e6fff2;
+      border: 2px solid #00cc66;
+    }
+    
+    .operator-button.selected {
+      background-color: #ff6600;
+      transform: scale(1.1);
+      box-shadow: 0 0 10px rgba(255, 102, 0, 0.5);
+    }
+    
+    .operator-hover {
+      background-color: #ffbb33;
+      transform: scale(1.05);
+    }
+    
+    .result-guide {
+      background-color: #004080;
+      font-size: 14px;
+      font-weight: normal;
+    }
+  `,document.head.appendChild(e)}function showMathResult(e,t){let n=document.getElementById("math-result");n&&(n.classList.remove("result-correct","result-warning","result-error"),n.classList.add("result-"+t),n.innerHTML=e,n.style.display="block","error"!==t)&&setTimeout(()=>{n.style.display="none"},6e3)}function startGame(e){var t,n;isGameStarting||isGameActive||(resetPagination(),isGameStarting=!0,isGameActive=!1,isPaused=!1,resetAnswerButton(),gameType=e,timeLeft=30,clearAllTimers(),preloadMusic(),(t=document.getElementById("pauseButton"))&&(t.innerHTML='<i class="fas fa-pause"></i>'),timerElement&&(timerElement.textContent=timeLeft,timerElement.style.display="flex",timerElement.style.color=""),actionButtons&&(actionButtons.style.display="block"),hintButton&&(hintButton.disabled=!0),answerButton&&(answerButton.disabled=!0),gameArea&&(gameArea.innerHTML=""),gameButtons&&(gameButtons.style.display="none"),inGameButtons&&(inGameButtons.style.display="block"),t=document.getElementById("word-input-area"),n=document.getElementById("math-input-area"),t&&(t.style.display="none"),n&&(n.style.display="none"),animationCount=0,totalAnimations="word"===e?9:7,"word"===e?loadWordList().then(()=>{createWordGame()}).catch(e=>{console.error("Kelime listesi yüklenirken hata:",e)}):createMathGame(),startTimerTimeout=setTimeout(()=>{startTimer(),hintButton&&(hintButton.disabled=!1),answerButton&&(answerButton.disabled=!1),isGameStarting=!1,isGameActive=!0,gameState.isAnswerDisplayed=!1},300*(totalAnimations+1)))}function preloadMusic(){var e=document.getElementById("countdownMusic");if(e)try{e.load(),e.volume=soundEnabled?volumeLevel/100:0,e.currentTime=0,countdownMusicPlaying=!1}catch(e){console.error("Müzik ön yükleme hatası:",e)}else console.error("countdown müzik elementi bulunamadı!")}function goToHomePage(){isGameStarting||(clearAllTimers(),resetGameState(),gameArea&&(gameArea.innerHTML=""),removeBlurAndPause(),actionButtons&&(actionButtons.style.display="none"),inGameButtons&&(inGameButtons.style.display="none"),gameButtons&&(gameButtons.style.display="block"),resetTimer(),stopCountdownMusic(),resetInputAreas(),clearResultAreas(),resetPagination(),resetAnswerButton())}function restartGame(){if(!isGameStarting){let e=gameType;clearAllTimers(),resetGameState(),removeBlurAndPause(),stopCountdownMusic(),resetAnswerButton(),resetInputAreas(),clearResultAreas(),resetPagination(),setTimeout(()=>{startGame(e)},100)}}function clearAllTimers(){timerInterval&&(clearInterval(timerInterval),timerInterval=null),startTimerTimeout&&(clearTimeout(startTimerTimeout),startTimerTimeout=null),activeIntervals.forEach(e=>{clearInterval(e)}),activeIntervals=[],window.closeTimer&&(clearTimeout(window.closeTimer),window.closeTimer=null),activeTasks={pauseTimer:!1}}function resetGameState(){isGameStarting=!1,isGameActive=!1,isPaused=!1,isProcessingWordCheck=!1,isProcessingMathCheck=!1,isShowingHint=!1,isProcessingUndoAction=!1,isProcessingClearAction=!1,calculationSteps=[],currentSelectedNumber=null,currentOperator=null,usedNumbers=[],countdownMusicPlaying=!1,gameState.isAnswerDisplayed=!1}function removeBlurAndPause(){var e=document.getElementById("paused-overlay"),e=(e&&(e.style.display="none"),document.getElementById("pause-style"));e&&e.remove(),document.body.classList.remove("paused");document.querySelectorAll("#game-area > *, #word-input-area, #math-input-area").forEach(e=>{e.style.filter="",e.style.pointerEvents="auto",e.style.userSelect="auto"});e=document.getElementById("pauseButton");e&&(e.innerHTML='<i class="fas fa-pause"></i>',e.title="Duraklat",e.classList.remove("play-active"))}function resetTimer(){timerElement&&(timerElement.style.color="",timerElement.textContent="30",timerElement.style.display="block"),timeLeft=30}function resetInputAreas(){var e=document.getElementById("word-input-area"),t=document.getElementById("math-input-area"),n=document.getElementById("word-answer");e&&(e.style.display="none",n)&&(n.value=""),t&&(t.style.display="none")}function clearResultAreas(){var e=document.getElementById("word-result"),t=document.getElementById("math-result");e&&(e.innerHTML="",e.style.display="none"),t&&(t.innerHTML="",t.style.display="none")}function removeAnswerArea(){var e=document.getElementById("answer-area"),e=(e&&e.remove(),document.getElementById("pagination-area"));e&&e.remove()}function generateLetters(){var t=[];for(let e=0;e<8;e++)t.push(letters[Math.floor(Math.random()*letters.length)]);return t.push(joker),t}function generateNumbers(){var t=[1,2,3,4,5,6,7,8,9,10,25,50,75,100],n=[];for(let e=0;e<4;e++){var a=Math.floor(10*Math.random());n.push(t[a])}for(let e=0;e<2;e++){var i=Math.floor(4*Math.random())+10;n.push(t[i])}return n.sort(()=>Math.random()-.5)}document.addEventListener("DOMContentLoaded",function(){document.addEventListener("copy",function(e){return e.preventDefault(),!1}),document.addEventListener("contextmenu",function(e){return e.preventDefault(),!1});var e=document.createElement("style");e.textContent=`
+      .container {
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
       }
-  }
-  return true;
-}
-
-function createMathGame() {
-  const smallNumbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-  const bigNumbers = [25, 50, 75, 100];
-
-  currentNumbers = [];
-  for (let i = 0; i < 4; i++) {
-    const index = Math.floor(Math.random() * smallNumbers.length);
-    currentNumbers.push(smallNumbers[index]);
-    smallNumbers.splice(index, 1);
-  }
-
-  for (let i = 0; i < 2; i++) {
-    const index = Math.floor(Math.random() * bigNumbers.length);
-    currentNumbers.push(bigNumbers[index]);
-    bigNumbers.splice(index, 1);
-  }
-
-  if (gameArea) {
-    const numbersContainer = document.createElement("div");
-    numbersContainer.id = "numbers-container";
-    gameArea.appendChild(numbersContainer);
-
-    animationCount = 0;
-    currentNumbers.forEach((number, index) => {
-      setTimeout(() => {
-        const numberBox = document.createElement("div");
-        numberBox.className = "number-box";
-        numberBox.style.opacity = "0";
-        numbersContainer.appendChild(numberBox);
-
-        setTimeout(() => {
-          numberBox.style.opacity = "1";
-          animateLetterOrNumber(numberBox, number.toString(), false);
-        }, 50);
-      }, index * 300);
-    });
-
-    currentTarget = Math.floor(Math.random() * 900) + 100;
-    setTimeout(() => {
-      const targetElement = document.createElement("div");
-      targetElement.id = "target";
-      targetElement.innerHTML = `Hedef: <span id="target-number">000</span>`;
-      targetElement.style.opacity = "0";
-      gameArea.appendChild(targetElement);
-
-      setTimeout(() => {
-        targetElement.style.opacity = "1";
-        const targetNumberElement = document.getElementById("target-number");
-        animateNumber(targetNumberElement, currentTarget);
-      }, 50);
-    }, currentNumbers.length * 300);
-  }
-}
-
-function animateNumber(element, finalNumber) {
-  let current = 0;
-  const interval = setInterval(() => {
-    current = Math.min(current + Math.ceil(Math.random() * 100), finalNumber);
-    element.textContent = current.toString().padStart(3, "0");
-    if (current === finalNumber) {
-      clearInterval(interval);
-      animationCount++;
-      if (animationCount === totalAnimations) {
-        startTimer();
-      }
-    }
-  }, 100);
-}
-
-function createBox(type, content) {
-  const box = document.createElement("div");
-  box.className = `${type}-box`;
-  box.textContent = content;
-  gameArea.appendChild(box);
-}
-
-function animateBoxes() {
-  const boxes = document.querySelectorAll(".letter-box, .number-box, #target");
-  boxes.forEach((box, index) => {
-    setTimeout(() => {
-      box.style.opacity = "1";
-    }, index * 500);
-  });
-}
-
-function stopTimer() {
-  if (!isGameActive) return;
-
-  clearInterval(timer);
-  clearTimeout(startTimerTimeout);
-  if (timerElement) {
-    timerElement.style.display = "none";
-  }
-  if (foundButton) foundButton.disabled = true;
-  if (hintButton) hintButton.disabled = true;
-  isGameActive = false;
-  updateButtonStates();
-}
-
-function updateButtonStates() {
-  if (foundButton) foundButton.disabled = !isGameActive;
-  if (hintButton) hintButton.disabled = !isGameActive;
-  if (answerButton) answerButton.disabled = false;
-}
-
-function updateTimer() {
-  if (timerElement && isGameActive) {
-    timerElement.textContent = timeLeft;
-    if (timeLeft === 0) {
-      clearInterval(timer);
-      timerElement.textContent = "Süre doldu!";
-      timerElement.style.color = "yellow";
-      isGameActive = false;
-      const gameAreaContent = document.querySelectorAll("#game-area > *");
-      gameAreaContent.forEach((element) => {
-        element.style.opacity = "0.5";
-      });
-    } else {
-      timeLeft--;
-    }
-  }
-}
-
-async function showHint() {
-  if (isGameStarting) return;
-
-  if (timerElement.style.color === "yellow") {
-    clearInterval(timer);
-    clearTimeout(startTimerTimeout);
-    timerElement.style.color = "";
-    updateButtonStates();
-  }
-
-  if (gameType === "word") {
-    const letters = Array.from(document.querySelectorAll('.letter-box')).map(box => box.textContent);
-    const longestWithoutJoker = await findLongestWord(letters, false);
-    const longestWithJoker = await findLongestWord(letters, true);
-    alert(`En uzun kelime (jokersiz): ${longestWithoutJoker.length} harfli\nEn uzun kelime (jokerli): ${longestWithJoker.length} harfli`);
-  } else {
-    const solution = solve_numbers(currentNumbers, currentTarget, false);
-    const lines = solution.split("\n");
-    if (lines.length > 1) {
-      alert("Tam çözüm mevcut");
-    } else {
-      alert("Tam çözüm bulunamadı, yaklaşık çözümler mevcut");
-    }
-  }
-}
-
-let currentPage = 1;
-const resultsPerPage = 3;
-
-async function showAnswer() {
-  if (isGameStarting) return;
-
-  if (timerElement.style.color === "yellow") {
-    clearInterval(timer);
-    clearTimeout(startTimerTimeout);
-    timerElement.style.color = "";
-    updateButtonStates();
-  }
-
-  let answerArea = document.getElementById("answer-area");
-  if (!answerArea) {
-    answerArea = document.createElement("div");
-    answerArea.id = "answer-area";
-    gameArea.appendChild(answerArea);
-  }
-
-  if (answerArea.style.display === "none" || answerArea.style.display === "") {
-    if (gameType === "word") {
-      const letters = Array.from(document.querySelectorAll('.letter-box')).map(box => box.textContent);
-      const longestWithoutJoker = await findLongestWord(letters, false);
-      const longestWithJoker = await findLongestWord(letters, true);
       
-      const highlightJoker = (word) => {
-        const jokerIndex = word.split('').findIndex((char, index) => !letters.includes(char) || (char === '?' && letters.indexOf(char) === index));
-        if (jokerIndex !== -1) {
-          return word.split('').map((char, index) => 
-            index === jokerIndex ? `<span class="joker-letter">${char}</span>` : char
-          ).join('');
-        }
-        return word;
-      };
-
-      answerArea.innerHTML = `
-        En uzun kelime (jokersiz): ${longestWithoutJoker}<br>
-        En uzun kelime (jokerli): ${highlightJoker(longestWithJoker)}
-      `;
-    } else {
-      const solution = solve_numbers(currentNumbers, currentTarget, false);
-      allResults = solution.split("\n\n").filter((r) => r.trim() !== "");
-
-      if (allResults.length > 0) {
-        displayResults();
-        createPagination();
-      } else {
-        answerArea.textContent = "Çözüm bulunamadı.";
+      /* Sadece input alanlarına müdahale etme */
+      input, textarea {
+        -webkit-user-select: auto;
+        -moz-user-select: auto;
+        -ms-user-select: auto;
+        user-select: auto;
       }
-    }
-    answerArea.style.display = "block";
-    answerButton.textContent = "CEVABI GİZLE";
-  } else {
-    answerArea.style.display = "none";
-    answerButton.textContent = "CEVABI GÖSTER";
-    const paginationArea = document.getElementById("pagination-area");
-    if (paginationArea) paginationArea.remove();
-  }
-}
-
-function displayResults() {
-  const answerArea = document.getElementById("answer-area");
-  const start = (currentPage - 1) * resultsPerPage;
-  const end = start + resultsPerPage;
-  const pageResults = allResults.slice(start, end);
-
-  answerArea.innerHTML = pageResults.join('<hr>');
-}
-
-function createPagination() {
-  const totalPages = Math.ceil(allResults.length / resultsPerPage);
-  let paginationHTML = '';
-
-  for (let i = 1; i <= totalPages; i++) {
-    paginationHTML += `<button onclick="changePage(${i})"${i === currentPage ? ' class="active"' : ''}>${i}</button>`;
-  }
-
-  let paginationArea = document.getElementById("pagination-area");
-  if (!paginationArea) {
-    paginationArea = document.createElement('div');
-    paginationArea.id = "pagination-area";
-    document.getElementById("answer-area").after(paginationArea);
-  }
-  paginationArea.innerHTML = paginationHTML;
-}
-
-function changePage(page) {
-  currentPage = page;
-  displayResults();
-  createPagination();
-}
-
-function stopTimer() {
-  clearInterval(timer);
-  timerElement.style.color = "#ff3300";
-  updateButtonStates();
-}
-
-function showPopup(content) {
-  let popup = document.createElement("div");
-  popup.className = "popup";
-
-  let popupContent = document.createElement("div");
-  popupContent.className = "popup-content";
-
-  let contentDiv = document.createElement("div");
-  contentDiv.innerHTML = content;
-
-  let closeButton = document.createElement("button");
-  closeButton.textContent = "Kapat";
-  closeButton.onclick = function () {
-    popup.remove();
-  };
-
-  popupContent.appendChild(contentDiv);
-  popupContent.appendChild(closeButton);
-  popup.appendChild(popupContent);
-  document.body.appendChild(popup);
-}
-
-let wordList = [];
-
-function loadWordList() {
-  return new Promise((resolve, reject) => {
-      if (window.wordList && window.wordList.length > 0) {
-          resolve(window.wordList);
-      } else {
-          const script = document.createElement('script');
-          script.src = 'turkce_kelimeler.js';
-          script.onload = () => {
-              if (window.wordList && window.wordList.length > 0) {
-                  resolve(window.wordList);
-              } else {
-                  reject(new Error('Kelime listesi yüklenemedi veya boş'));
-              }
-          };
-          script.onerror = () => reject(new Error('Kelime listesi yüklenemedi'));
-          document.head.appendChild(script);
+      
+      /* Oyun içi butonlar her zaman tıklanabilir olsun */
+      #in-game-buttons button {
+        position: relative;
+        z-index: 1000;
       }
-  });
-}
-
-function calculateResult() {
-  let solution = findSolution(currentNumbers, currentTarget);
-  if (solution) {
-    let solutionHTML = "";
-    solution.forEach((step, index) => {
-      solutionHTML += `${step.left} ${step.op} ${step.right} = ${step.result}<br>`;
-    });
-    solutionHTML += `<br><strong>Sonuç: ${solution[solution.length - 1].result
-      }</strong>`;
-    return solutionHTML;
-  } else {
-    return "Çözüm bulunamadı.";
-  }
-}
-
-var bestdiff;
-var bestvalsums;
-var allresults = [];
-var bestresult;
-
-const OPS = {
-  "+": function (n1, n2) {
-    if (n1 < 0 || n2 < 0) return false;
-    return n1 + n2;
-  },
-  "-": function (n1, n2) {
-    if (n2 >= n1) return false;
-    return n1 - n2;
-  },
-  _: function (n2, n1) {
-    if (n2 >= n1) return false;
-    return n1 - n2;
-  },
-  "*": function (n1, n2) {
-    return n1 * n2;
-  },
-  "/": function (n1, n2) {
-    if (n2 == 0 || n1 % n2 != 0) return false;
-    return n1 / n2;
-  },
-  "?": function (n2, n1) {
-    if (n2 == 0 || n1 % n2 != 0) return false;
-    return n1 / n2;
-  },
-};
-
-const OPCOST = {
-  "+": 1,
-  "-": 1.05,
-  _: 1.05,
-  "*": 1.2,
-  "/": 1.3,
-  "?": 1.3,
-};
-
-let allResults = [];
-
-function solveNumbers(numbers, target) {
-  allResults = [];
-  const initialNumbers = numbers.map((n) => [n, false]);
-  recursiveSolve(
-    initialNumbers,
-    0,
-    new Array(numbers.length).fill(false),
-    target,
-    numbers.length,
-    0
-  );
-  return sortAndFormatResults(target);
-}
-
-function recursiveSolve(
-  numbers,
-  searchIndex,
-  wasGenerated,
-  target,
-  levels,
-  valueSum
-) {
-  if (levels <= 0) return;
-
-  for (let i = 0; i < numbers.length - 1; i++) {
-    if (numbers[i] === false) continue;
-    const ni = numbers[i];
-    numbers[i] = false;
-
-    for (let j = i + 1; j < numbers.length; j++) {
-      if (numbers[j] === false) continue;
-      const nj = numbers[j];
-
-      if (i < searchIndex && !wasGenerated[i] && !wasGenerated[j]) continue;
-
-      for (const [op, func] of Object.entries(OPS)) {
-        const result = func(ni[0], nj[0]);
-        if (result === null) continue;
-
-        const opCost = calculateOpCost(result, op);
-        const newValueSum = valueSum + opCost;
-
-        allResults.push({
-          valueSum: newValueSum,
-          answer: [result, op, ni, nj],
-        });
-
-        numbers[j] = [result, op, ni, nj];
-        const oldWasGenerated = wasGenerated[j];
-        wasGenerated[j] = true;
-
-        recursiveSolve(
-          numbers,
-          i + 1,
-          wasGenerated,
-          target,
-          levels - 1,
-          newValueSum
-        );
-
-        wasGenerated[j] = oldWasGenerated;
-        numbers[j] = nj;
+      
+      /* Pause durumunda overlay altında kalmasın */
+      #paused-overlay {
+        z-index: 9000;
       }
+    `,document.head.appendChild(e);let t=document.getElementById("soundToggleButton");e=document.getElementById("volumeSlider");let n=document.getElementById("volumePercentage"),a=document.getElementById("volumeControl"),i=document.getElementById("countdownMusic");var o=document.getElementById("pauseButton"),r=document.getElementById("confirm-yes"),s=document.getElementById("confirm-no");let l=document.getElementById("confirmation-modal");var u=document.querySelector(".sound-controls");u&&document.body.appendChild(u),setupGameButtons(),setupModalButtons(),addPlayButtonStyles(),addStylesForMathInput(),i&&(i.volume=volumeLevel/100),t&&(t.addEventListener("click",function(){toggleSound(),a&&(a.classList.add("active"),a.closeTimer&&(clearTimeout(a.closeTimer),a.closeTimer=null),a.closeTimer=setTimeout(()=>{a.classList.remove("active")},5e3))}),t.addEventListener("mouseenter",function(){a&&(a.classList.add("active"),a.closeTimer&&(clearTimeout(a.closeTimer),a.closeTimer=null),a.closeTimer=setTimeout(()=>{a.classList.remove("active")},5e3))})),a&&(a.addEventListener("mouseenter",function(){a.closeTimer&&(clearTimeout(a.closeTimer),a.closeTimer=null)}),a.addEventListener("mouseleave",function(){a.closeTimer&&(clearTimeout(a.closeTimer),a.closeTimer=null),a.closeTimer=setTimeout(()=>{a.classList.remove("active")},2e3)}),document.addEventListener("touchstart",function(e){!a.classList.contains("active")||a.contains(e.target)||t===e.target||t.contains(e.target)||(a.classList.remove("active"),a.closeTimer&&(clearTimeout(a.closeTimer),a.closeTimer=null))})),e&&n&&e.addEventListener("input",function(){volumeLevel=this.value,n.textContent=volumeLevel+"%",i&&(i.volume=soundEnabled?volumeLevel/100:0),void 0!==playSound.sounds&&Object.values(playSound.sounds).forEach(e=>{e.volume=soundEnabled?volumeLevel/100:0}),0==volumeLevel?soundEnabled&&(soundEnabled=!1,updateSoundIcon()):soundEnabled||(soundEnabled=!0,updateSoundIcon()),a&&a.closeTimer&&(clearTimeout(a.closeTimer),a.closeTimer=null),a.closeTimer=setTimeout(()=>{a.classList.remove("active")},5e3)}),o&&o.addEventListener("click",togglePause);let c=document.getElementById("answerButton");c&&c.addEventListener("click",handleAnswerButton),r&&r.addEventListener("click",function(){l&&(l.style.display="none"),isGameActive=!1,clearAllTimers(),stopCountdownMusic(),timerElement&&(timerElement.style.color="#ff3300"),updateButtonStates();let e=document.getElementById("answer-area");e||((e=document.createElement("div")).id="answer-area",gameArea.appendChild(e)),("word"===gameType?fillWordAnswers:fillMathAnswers)(e),e.style.display="block",c&&(c.innerHTML='<i class="fas fa-eye-slash"></i> CEVABI GİZLE')}),s&&s.addEventListener("click",function(){l&&(l.style.display="none"),isGameActive&&(timer=setInterval(updateTimerWithSound,1e3))})});let vowels="AEIİOÖUÜ",consonants="BCÇDFGĞHJKLMNPRSŞTVYZ",consonantFrequency={B:2,C:1,"Ç":1,D:1,F:1,G:1,"Ğ":1,H:1,J:1,K:5,L:3,M:3,N:3,P:1,R:1,S:3,"Ş":1,T:1,V:1,Y:2,Z:1},vowelFrequency={A:8,E:9,I:5,"İ":7,O:3,"Ö":1,U:3,"Ü":2};function getWeightedLetter(e){var t,n,e=e?vowelFrequency:consonantFrequency,a=Object.values(e).reduce((e,t)=>e+t,0);let i=Math.floor(Math.random()*a);for([t,n]of Object.entries(e)){if(i<n)return t;i-=n}}function startTimer(){var e;clearAllTimers(),timeLeft=30,timerElement&&(timerElement.textContent=timeLeft),timerInterval=setInterval(function(){!isGameActive||isPaused||(timerElement&&(timerElement.textContent=timeLeft),0===timeLeft?handleTimeExpiration():timeLeft--)},1e3),activeIntervals.push(timerInterval),"word"===gameType?(e=document.getElementById("word-input-area"))&&(e.style.display="block",setupWordInputArea()):"math"===gameType&&(e=document.getElementById("math-input-area"))&&(e.style.display="block",setupMathInputArea()),setTimeout(()=>{startCountdownMusic()},100)}function resetAnswerButton(){answerButton&&(answerButton.innerHTML='<i class="fas fa-eye"></i> CEVAP');var e=document.getElementById("answer-area"),e=(e&&e.remove(),document.getElementById("pagination-area"));e&&e.remove(),gameState.isAnswerDisplayed=!1}function updateTimerDisplay(){timerElement&&(timerElement.textContent=timeLeft)}function animateLetterOrNumber(e,t,n){let a=n?"ABCÇDEFGĞHIİJKLMNOÖPRSŞTUÜVYZ":"0123456789",i=0,o=setInterval(()=>{e.textContent=a[Math.floor(Math.random()*a.length)],15===++i&&(clearInterval(o),e.textContent=t,++animationCount===totalAnimations+1)&&startTimer()},100)}async function createWordGame(){let t=[],n=0;var e=Math.random();n=e<.62?3:e<.92?4:5;for(let e=0;e<n;e++)t.push(getWeightedLetter(!0));for(;t.length<8;)t.push(getWeightedLetter(!1));if((t=t.sort(()=>Math.random()-.5)).push(joker),gameArea){let n=document.createElement("div");n.id="letters-container",gameArea.appendChild(n),animationCount=0,t.forEach((t,e)=>{setTimeout(()=>{let e=document.createElement("div");e.className="letter-box",e.style.opacity="0",n.appendChild(e),setTimeout(()=>{e.style.opacity="1",animateLetterOrNumber(e,t,!0)},50)},300*e)})}}async function findLongestWord(e,t=!1){let n=e.slice();n.indexOf("?");return window.wordList&&0!==window.wordList.length||await loadWordList(),window.wordList.filter(e=>canFormWord(e,n,t)).reduce((e,t)=>t.length>e.length?t:e,"")}function canFormWord(e,t,n){var a,i=t.slice(),o=i.indexOf("?");let r=!1;for(a of e){var s=i.indexOf(a);if(-1!==s)i[s]=null;else{if(!n||r||-1===o)return!1;i[o]=null,r=!0}}return!0}function createMathGame(){var t=[1,2,3,4,5,6,7,8,9,10],n=[25,50,75,100];currentNumbers=[];for(let e=0;e<4;e++){var a=Math.floor(Math.random()*t.length);currentNumbers.push(t[a]),t.splice(a,1)}for(let e=0;e<2;e++){var i=Math.floor(Math.random()*n.length);currentNumbers.push(n[i]),n.splice(i,1)}if(gameArea){let n=document.createElement("div");n.id="numbers-container",gameArea.appendChild(n),animationCount=0,currentNumbers.forEach((t,e)=>{setTimeout(()=>{let e=document.createElement("div");e.className="number-box",e.style.opacity="0",n.appendChild(e),setTimeout(()=>{e.style.opacity="1",animateLetterOrNumber(e,t.toString(),!1)},50)},300*e)}),currentTarget=Math.floor(900*Math.random())+100,setTimeout(()=>{let e=document.createElement("div");e.id="target",e.innerHTML='Hedef: <span id="target-number">000</span>',e.style.opacity="0",gameArea.appendChild(e),setTimeout(()=>{e.style.opacity="1",animateNumber(document.getElementById("target-number"),currentTarget)},50)},300*currentNumbers.length)}}function animateNumber(e,t){let n=0,a=setInterval(()=>{n=Math.min(n+Math.ceil(100*Math.random()),t),e.textContent=n.toString().padStart(3,"0"),n===t&&(clearInterval(a),++animationCount===totalAnimations)&&startTimer()},100)}function stopTimer(){var e;isGameActive&&(clearAllTimers(),clearTimeout(startTimerTimeout),timerElement&&(timerElement.style.color="#ff3300"),updateButtonStates(),isGameActive=!1,stopCountdownMusic(),"word"===gameType?(e=document.getElementById("word-input-area"))&&(e.style.display="block",setupWordInputArea()):"math"===gameType&&(e=document.getElementById("math-input-area"))&&(e.style.display="block",setupMathInputArea()))}function updateButtonStates(){hintButton&&(hintButton.disabled=!isGameActive),answerButton&&(answerButton.disabled=!1)}function updateTimer(){timerElement&&isGameActive&&(0===(timerElement.textContent=timeLeft)?(clearAllTimers(),timerElement.textContent="Süre doldu!",timerElement.style.color="yellow",isGameActive=!1,stopCountdownMusic(),document.querySelectorAll("#game-area > *").forEach(e=>{e.style.opacity="0.75"}),hintButton&&(hintButton.disabled=!1),answerButton&&(answerButton.disabled=!1),setTimeout(function(){showAnswers()},2e3)):timeLeft--)}function updateTimerWithSound(){timerElement&&isGameActive&&(updateTimerDisplay(),0===timeLeft?handleTimeExpiration():timeLeft--)}function handleWordTimeUp(t){0<t.length?(showNotification("Süre doldu! Girdiğiniz kelime: "+t.toUpperCase(),"warning"),setTimeout(()=>{var e=document.querySelectorAll(".letter-box"),e=Array.from(e).map(e=>e.textContent);canFormWord(t.toUpperCase(),e,!0)?window.wordList&&Array.isArray(window.wordList)&&(window.wordList.includes(t.toUpperCase())?showNotification(`"${t.toUpperCase()}" geçerli bir kelime. Tebrikler!`,"success"):showNotification(`"${t.toUpperCase()}" Türkçe sözlükte bulunamadı.`,"warning")):showNotification(`"${t.toUpperCase()}" verilen harflerle oluşturulamaz.`,"error"),setTimeout(()=>{showAnswer()},1500)},1500)):setTimeout(()=>{showAnswer()},1e3)}function handleTimeExpiration(){if(clearAllTimers(),timerElement&&(timerElement.textContent="Süre doldu!",timerElement.style.color="yellow"),isGameActive=!1,document.querySelectorAll("#game-area > *").forEach(e=>{e.style.opacity="0.75"}),stopCountdownMusic(),hintButton&&(hintButton.disabled=!1),answerButton&&(answerButton.disabled=!1),"word"===gameType){showNotification("Süre doldu! Ancak yine de kelime girmeye devam edebilirsiniz.","info");let e=document.getElementById("word-answer");e&&setTimeout(()=>{e.focus()},1e3)}else"math"===gameType&&showNotification("Süre doldu! Ancak hesaplamaya devam edebilirsiniz.","info");setTimeout(()=>{displayAnswers()},2e3)}function handleMathTimeUp(){let e=null;var t;null!==(e=0<calculationSteps.length?calculationSteps[calculationSteps.length-1].result:e)&&(0===(t=Math.abs(e-currentTarget))?showMathResult("Tebrikler! Tam sonuç: "+e,"correct"):showMathResult(`Sonucunuz: ${e} (Hedef sayıdan ${t} uzaktasınız)`,"warning")),setTimeout(()=>{answerButton&&showAnswer()},2e3)}async function showHint(){if(!isGameStarting&&!isShowingHint){if("yellow"===timerElement.style.color&&(clearAllTimers(),clearTimeout(startTimerTimeout),timerElement.style.color="",updateButtonStates()),isShowingHint=!0,notificationSystem.init(),"word"===gameType){var t=Array.from(document.querySelectorAll(".letter-box")).map(e=>e.textContent),e=await findLongestWord(t,!1),t=await findLongestWord(t,!0),e=`
+      <div class="hint-content">
+        <h3>İpucu</h3>
+        <p>En uzun kelime (jokersiz): <strong>${e.length} harfli</strong></p>
+        <p>En uzun kelime (jokerli): <strong>${t.length} harfli</strong></p>
+      </div>
+    `;notificationSystem.show(e,"hint",5e3)}else{t=solve_numbers(currentNumbers,currentTarget,!1).split("\n");let e;e=1<t.length?`
+        <div class="hint-content">
+          <h3>İpucu</h3>
+          <p>Tam çözüm mevcut!</p>
+          <p>Hedef sayı: <strong>${currentTarget}</strong></p>
+          <p>İşlem yaparken çıkarma ve bölme işlemlerinde tam sayı sonucu veren işlemler kullanmayı deneyin.</p>
+        </div>
+      `:`
+        <div class="hint-content">
+          <h3>İpucu</h3>
+          <p>Tam çözüm bulunamadı, ancak yaklaşık çözümler mevcut.</p>
+          <p>Hedef sayı: <strong>${currentTarget}</strong></p>
+          <p>Hedefe en yakın sonucu bulmayı deneyin.</p>
+        </div>
+      `,notificationSystem.show(e,"hint",5e3)}setTimeout(()=>{isShowingHint=!1},5e3)}}function closeHintNotification(){notificationSystem.isShowingHintNotification()&&(notificationSystem.clearAllNotifications(),isShowingHint=!1)}let currentPage=1,resultsPerPage=3;function showAnswer(){(isGameActive?openConfirmationModal:toggleAnswerDisplay)()}function showAnswers(){(isGameActive?openConfirmationModal:toggleAnswerDisplay)()}function displayAnswers(){(isGameActive?openConfirmationModal:toggleAnswerDisplay)()}function showConfirmationModal(){openConfirmationModal()}async function findAllPossibleWords(t,n,e=!0){window.wordList&&0!==window.wordList.length||await loadWordList();var a=window.wordList.filter(e=>e.length>=n&&canFormWord(e,t,!0)).sort((e,t)=>t.length-e.length||e.localeCompare(t));if(e&&0<a.length){let t=a[0].length;return a.filter(e=>e.length===t)}return a}function formatPossibleWords(e,a){if(!e||0===e.length)return"Kelime bulunamadı";let i={},o=(e.forEach(e=>{var t=e.length;i[t]||(i[t]=[]),i[t].push(e)}),"");return Object.keys(i).sort((e,t)=>t-e).forEach(e=>{var t,n=i[e];0<n.length&&(t=n.map(e=>highlightJoker(e,a)).join(", "),o+=`<div class="word-group">
+          <h4>${e} harfli kelimeler (${n.length} adet):</h4>
+          <p>${t}</p>
+        </div>`)}),o}function highlightJoker(e,t){if(!e||0===e.length)return"";var n,a=[...t],i=[];for(n of e.split("")){var o=a.indexOf(n);-1!==o?(a[o]=null,i.push(n)):i.push(`<span style="color: #ff9900; font-weight: bold; background-color: rgba(255, 153, 0, 0.2); padding: 0 3px; border-radius: 3px;">${n}</span>`)}return i.join("")}function displayResults(){var e=document.getElementById("answer-area"),t=(currentPage-1)*resultsPerPage,n=t+resultsPerPage,t=allResults.slice(t,n);e.innerHTML=t.join("<hr>")}function createPagination(){var t=Math.ceil(allResults.length/resultsPerPage);let n="";for(let e=1;e<=t;e++)n+=`<button onclick="changePage(${e})"${e===currentPage?' class="active"':""}>${e}</button>`;let e=document.getElementById("pagination-area");e||((e=document.createElement("div")).id="pagination-area",document.getElementById("answer-area").after(e)),e.innerHTML=n}function changePage(e){currentPage=e,displayResults(),createPagination()}function resetPagination(){currentPage=1}function stopTimer(){clearAllTimers(),timerElement.style.color="#ff3300",updateButtonStates()}function showPopup(e){let t=document.createElement("div");t.className="popup";var n=document.createElement("div"),a=(n.className="popup-content",document.createElement("div")),e=(a.innerHTML=e,document.createElement("button"));e.textContent="Kapat",e.onclick=function(){t.remove()},n.appendChild(a),n.appendChild(e),t.appendChild(n),document.body.appendChild(t)}let wordList=[];function loadWordList(){return new Promise((e,t)=>{var n;window.wordList&&0<window.wordList.length?e(window.wordList):((n=document.createElement("script")).src="turkce_kelimeler.js",n.onload=()=>{window.wordList&&0<window.wordList.length?e(window.wordList):t(new Error("Kelime listesi yüklenemedi veya boş"))},n.onerror=()=>t(new Error("Kelime listesi yüklenemedi")),document.head.appendChild(n))})}function calculateResult(){var e=findSolution(currentNumbers,currentTarget);if(e){let n="";return e.forEach((e,t)=>{n+=e.left+` ${e.op} ${e.right} = ${e.result}<br>`}),n+=`<br><strong>Sonuç: ${e[e.length-1].result}</strong>`}return"Çözüm bulunamadı."}var bestdiff,bestvalsums,bestresult,allresults=[];let OPS={"+":function(e,t){return!(e<0||t<0)&&e+t},"-":function(e,t){return!(e<=t)&&e-t},_:function(e,t){return!(t<=e)&&t-e},"*":function(e,t){return e*t},"/":function(e,t){return 0!=t&&e%t==0&&e/t},"?":function(e,t){return 0!=e&&t%e==0&&t/e}},OPCOST={"+":1,"-":1.05,_:1.05,"*":1.2,"/":1.3,"?":1.3},allResults=[];function solveNumbers(e,t){return allResults=[],recursiveSolve(e.map(e=>[e,!1]),0,new Array(e.length).fill(!1),t,e.length,0),sortAndFormatResults(t)}function recursiveSolve(n,a,i,o,r,s){if(!(r<=0))for(let t=0;t<n.length-1;t++)if(!1!==n[t]){var l=n[t];n[t]=!1;for(let e=t+1;e<n.length;e++)if(!1!==n[e]){var u=n[e];if(!(t<a)||i[t]||i[e])for(var[c,d]of Object.entries(OPS)){var m,d=d(l[0],u[0]);null!==d&&(m=s+calculateOpCost(d,c),allResults.push({valueSum:m,answer:[d,c,l,u]}),n[e]=[d,c,l,u],d=i[e],i[e]=!0,recursiveSolve(n,t+1,i,o,r-1,m),i[e]=d,n[e]=u)}}n[t]=l}}function calculateOpCost(e,t){let n=Math.abs(e);for(;n%10==0&&0!==n;)n/=10;return n*OPCOST[t]}function sortAndFormatResults(i){allResults.sort((e,t)=>{var n=Math.abs(e.answer[0]-i),a=Math.abs(t.answer[0]-i);return n!==a?n-a:e.valueSum-t.valueSum});var e,t=new Set;let n="";for(e of allResults){var a=formatResult(e.answer,i);t.has(a)||(t.add(a),n+=a+"\n\n")}return n.trim()}function formatResult(e,t){e=serializeResult(tidyUpResult(e));return stringifyResult(e,t)}function tidyup_result(e){var t={"?":"/",_:"-"},n={"*":!0,"+":!0};if(!(e.length<4)){for(var a=2;a<e.length;a++){var i=e[a];(i=tidyup_result(i))[1]==e[1]&&n[e[1]]?(e.splice(a--,1),e=e.concat(i.slice(2))):e[a]=i}if(e[1]in t){e[1]=t[e[1]];t=e[2];e[2]=e[3],e[3]=t}else if(n[e[1]]){childs=e.slice(2).sort(function(e,t){return t[0]-e[0]});for(a=2;a<e.length;a++)e[a]=childs[a-2]}}return e}function serialise_result(e){for(var t=[],n=2;n<e.length;n++){var a=e[n];4<=a.length&&t.push(serialise_result(a))}for(var t=t.sort(function(e,t){return fullsize(t)-fullsize(e)}),i=[],n=0;n<t.length;n++)i=i.concat(t[n]);var o=e.slice(2).map(function(e){return e[0]}),o=[e[0],e[1]].concat(o);return i.concat([o])}function stringify_result(e,t){var n="";e=e.slice(0);for(var a=0;a<e.length;a++){var i=e[a];n+=i.slice(2).join(" "+i[1]+" ")+" = "+i[0]+"\n"}var o=e[e.length-1][0];return o!=t&&(n+="(off by "+Math.abs(o-t)+")\n"),n}function fullsize(e){if(e.constructor!=Array)return 0;for(var t=0,n=0;n<e.length;n++)t+=fullsize(e[n]);return t+e.length}function formatSolution(e){return e.map(e=>`${formatNumber(e.left)} ${e.op} ${formatNumber(e.right)} = `+formatNumber(e.result)).join("\n")+"\n"}function formatNumber(e){return Number.isInteger(e)?e.toString():e.toFixed(2)}function formatApproximateSolutions(e,n,l){let u=[];return function e(t,a=t[0],i=[]){if(1===t.length)Number.isInteger(a)&&Math.abs(a-n)<=l&&u.push({result:a,steps:i});else for(let n=1;n<t.length;n++){for(var o of["+","-","*"]){var r=calculate(a,t[n],o);Number.isInteger(r)&&e(t.filter((e,t)=>t!==n),r,[...i,{left:a,right:t[n],op:o,result:r}])}var s;0!==t[n]&&a%t[n]==0&&(s=a/t[n],e(t.filter((e,t)=>t!==n),s,[...i,{left:a,right:t[n],op:"/",result:s}]))}}(e),u.map(e=>{var t=e.result-n,t=0<t?"+"+t:""+t,e=e.steps.map(e=>e.left+` ${e.op} ${e.right} = `+e.result).join("\n");return n+t+`:
+`+e}).join("\n\n")}function solve_numbers(e,t,n){if(e.sort(),bestresult=[e[0],e[0]],!n){for(var a=1;a<e.length;a++)Math.abs(e[a]-t)<Math.abs(bestresult[0]-t)&&(bestresult=[e[a],e[a]],bestvalsums=e[a]);if(bestresult[0]==t)return t+" = "+t}allresults=[],_solve_numbers(e,t,n),allresults.sort(function(e,t){return e.valsums-t.valsums});for(var i="",o={},a=0;a<allresults.length;a++){var r=stringify_result(serialise_result(tidyup_result(allresults[a].answer)),t)+"\n\n";o[r]||(o[r]=!0,i+=r)}return i}function _solve_numbers(e,t,n){e=e.map(function(e){return[e,!1]});for(var a=[],i=0;i<e.length;i++)a.push(!1);return bestresult=[0,0],_recurse_solve_numbers(e,0,a,t,e.length,0,n),bestresult}function _recurse_solve_numbers(e,t,n,a,i,o,r){i--;for(var s=0;s<e.length-1;s++){var l=e[s];if(!1!==l){e[s]=!1;for(var u=s+1;u<e.length;u++){var c=e[u];if(!1!==c&&(!(s<t)||n[s]||n[u]))for(var d in OPS){var m=OPS[d](l[0],c[0]);if(!1!==m&&!("/"==d&&1==c[0]||"?"==d&&1==l[0]||"*"==d&&(1==l[0]||1==c[0])||m==l[0]||m==c[0])){for(var p=Math.abs(m);p%10==0&&0!=p;)p/=10;10!=l[0]&&10!=c[0]||"*"!=d||(p=1);var f=o+(p*=OPCOST[d]),m=((0==(allresults=0==allresults.length||Math.abs(m-a)<Math.abs(allresults[0].answer[0]-a)?[]:allresults).length||Math.abs(m-a)<=Math.abs(allresults[0].answer[0]-a))&&allresults.push(JSON.parse(JSON.stringify({valsums:o,answer:[m,d,l,c]}))),(Math.abs(m-a)<Math.abs(bestresult[0]-a)||Math.abs(m-a)==Math.abs(bestresult[0]-a)&&(r||f<bestvalsums))&&(bestresult=[m,d,l,c],bestvalsums=f),e[u]=[m,d,l,c],n[u]);n[u]=!0,0<i&&_recurse_solve_numbers(e,s+1,n,a,i,f,r),n[u]=m,e[u]=c}}}e[s]=l}}}let notificationSystem={container:null,timeout:null,activeNotification:null,init(){this.container=document.getElementById("notification-container"),this.container||(this.container=document.createElement("div"),this.container.id="notification-container",document.body.appendChild(this.container))},show(t,n="info",a=3e3){if("hint"!==n||!this.isShowingHintNotification()){this.timeout&&(clearTimeout(this.timeout),this.timeout=null),this.clearAllNotifications();let e=document.createElement("div");e.className="notification notification-"+n,e.innerHTML=`
+      <div class="notification-content">
+        <div class="notification-icon">
+          ${this.getIcon(n)}
+        </div>
+        <div class="notification-message">${t}</div>
+      </div>
+      <button class="notification-close">&times;</button>
+      <div class="notification-progress"></div>
+    `,this.activeNotification={element:e,type:n},e.querySelector(".notification-close").addEventListener("click",()=>{this.hide(e)}),e.querySelector(".notification-progress").style.animationDuration=a+"ms",this.container.appendChild(e),"hint"===n&&(isShowingHint=!0),this.timeout=setTimeout(()=>{this.hide(e)},a)}},isShowingHintNotification(){return this.activeNotification&&"hint"===this.activeNotification.type},clearAllNotifications(){this.container&&(this.container.innerHTML=""),this.activeNotification&&"hint"===this.activeNotification.type&&(isShowingHint=!1),this.activeNotification=null},hide(e){e.classList.add("notification-hiding"),this.activeNotification&&"hint"===this.activeNotification.type&&(isShowingHint=!1),e.addEventListener("animationend",()=>{e.classList.contains("notification-hiding")&&this.container.contains(e)&&(this.container.removeChild(e),this.activeNotification=null)})},getIcon(e){switch(e){case"success":return'<i class="fas fa-check-circle"></i>';case"error":return'<i class="fas fa-exclamation-circle"></i>';case"warning":return'<i class="fas fa-exclamation-triangle"></i>';case"hint":return'<i class="fas fa-lightbulb"></i>';default:return'<i class="fas fa-info-circle"></i>'}}};function showConfirmationModal(){var e=document.getElementById("confirmation-modal");e&&(e.style.display="flex",isGameActive)&&clearAllTimers()}function setupModalButtons(){var e=document.getElementById("confirm-yes"),t=document.getElementById("confirm-no");let n=document.getElementById("confirmation-modal");e&&t&&n?(e.replaceWith(e.cloneNode(!0)),t.replaceWith(t.cloneNode(!0)),e=document.getElementById("confirm-yes"),t=document.getElementById("confirm-no"),e.addEventListener("click",function(){n.style.display="none",isGameActive=!1,clearAllTimers(),timerElement&&(timerElement.style.color="#ff3300"),stopCountdownMusic(),toggleAnswerDisplay(),gameState.isAnswerDisplayed=!0}),t.addEventListener("click",function(){n.style.display="none",isGameActive&&(clearActiveTimers(),resumeTimer(),soundEnabled)&&resumeCountdownMusic()})):console.error("Modal butonları bulunamadı!")}function clearActiveTimers(){timerInterval&&(clearInterval(timerInterval),timerInterval=null),activeIntervals.forEach(e=>{clearInterval(e)}),activeIntervals=[]}function resumeTimer(){clearActiveTimers(),timerElement&&(timerElement.textContent=timeLeft),timerInterval=setInterval(function(){!isGameActive||isPaused||(timerElement&&(timerElement.textContent=timeLeft),0===timeLeft?handleTimeExpiration():timeLeft--)},1e3),activeIntervals.push(timerInterval)}function resumeCountdownMusic(){var e,t=document.getElementById("countdownMusic");if(t)if(soundEnabled)try{t.volume=volumeLevel/100,t.paused&&countdownMusicPlaying?void 0!==(e=t.play())&&e.then(()=>{}).catch(e=>{console.error("Müzik devam ettirme hatası:",e)}):countdownMusicPlaying||startCountdownMusic()}catch(e){console.error("Müzik devam ettirme hatası:",e)}else console.log("Ses kapalı olduğu için müzik devam ettirilmiyor");else console.error("countdown müzik elementi bulunamadı!")}async function showWordAnswers(e){let t=Array.from(document.querySelectorAll(".letter-box")).map(e=>e.textContent);var n=await findLongestWord(t,!1),a=await findLongestWord(t,!0),i=await findAllPossibleWords(t,3,!0);e.innerHTML=`
+    <h3 style="color: #ffcc00; margin-top: 0; margin-bottom: 10px;">En İyi Çözümler</h3>
+    
+    <div style="background-color: rgba(0, 0, 0, 0.2); border-radius: 5px; padding: 10px; margin-bottom: 15px;">
+      <div style="margin-bottom: 8px;">
+        <strong>En uzun kelime (jokersiz):</strong> 
+        <span style="color: #00cc66; font-size: 18px; font-weight: bold;">${highlightJoker(n,t)}</span>
+      </div>
+      
+      <div>
+        <strong>En uzun kelime (jokerli):</strong> 
+        <span style="color: #00cc66; font-size: 18px; font-weight: bold;">${highlightJoker(a,t)}</span>
+      </div>
+    </div>
+    
+    ${0<i.length?`
+    <h3 style="color: #ffcc00; margin-top: 15px; margin-bottom: 10px;">Diğer Olası ${i[0].length} Harfli Kelimeler</h3>
+    
+    <div style="background-color: rgba(0, 0, 0, 0.2); border-radius: 5px; padding: 10px;">
+      <p style="margin: 0; line-height: 1.4;">
+        ${i.map(e=>highlightJoker(e,t)).join(", ")}
+      </p>
+    </div>
+    `:""}
+  `}function showMathAnswers(e){var t=solve_numbers(currentNumbers,currentTarget,!1);0<(allResults=t.split("\n\n").filter(e=>""!==e.trim())).length?(displayResults(),createPagination()):e.textContent="Çözüm bulunamadı."}function addFixedWordStyles(){var e=document.createElement("style"),t=(e.id="fixed-word-results-styles",e.textContent=`
+    /* Kelime sonuçları için özel stilller */
+    .answer-section {
+      margin-bottom: 15px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+      padding-bottom: 10px;
     }
-
-    numbers[i] = ni;
-  }
-}
-
-function calculateOpCost(result, op) {
-  let opCost = Math.abs(result);
-  while (opCost % 10 === 0 && opCost !== 0) opCost /= 10;
-  return opCost * OPCOST[op];
-}
-
-function sortAndFormatResults(target) {
-  allResults.sort((a, b) => {
-    const diffA = Math.abs(a.answer[0] - target);
-    const diffB = Math.abs(b.answer[0] - target);
-    if (diffA !== diffB) return diffA - diffB;
-    return a.valueSum - b.valueSum;
-  });
-
-  const uniqueResults = new Set();
-  let formattedResults = "";
-
-  for (const result of allResults) {
-    const formatted = formatResult(result.answer, target);
-    if (!uniqueResults.has(formatted)) {
-      uniqueResults.add(formatted);
-      formattedResults += formatted + "\n\n";
+    
+    .answer-section:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
     }
-  }
-
-  return formattedResults.trim();
-}
-
-function formatResult(result, target) {
-  const steps = serializeResult(tidyUpResult(result));
-  return stringifyResult(steps, target);
-}
-
-function tidyup_result(result) {
-  var mapping = {
-    "?": "/",
-    _: "-",
-  };
-
-  var swappable = {
-    "*": true,
-    "+": true,
-  };
-
-  if (result.length < 4) return result;
-
-  for (var i = 2; i < result.length; i++) {
-    var child = result[i];
-
-    child = tidyup_result(child);
-
-    if (child[1] == result[1] && swappable[result[1]]) {
-      result.splice(i--, 1);
-      result = result.concat(child.slice(2));
-    } else {
-      result[i] = child;
+    
+    .answer-section h3 {
+      color: #ffcc00;
+      margin-top: 0;
+      margin-bottom: 10px;
+      font-size: 18px;
     }
-  }
-
-  if (result[1] in mapping) {
-    result[1] = mapping[result[1]];
-    var j = result[2];
-    result[2] = result[3];
-    result[3] = j;
-  } else if (swappable[result[1]]) {
-    childs = result.slice(2).sort(function (a, b) {
-      return b[0] - a[0];
-    });
-    for (var i = 2; i < result.length; i++) result[i] = childs[i - 2];
-  }
-
-  return result;
-}
-
-function serialise_result(result) {
-  var childparts = [];
-
-  for (var i = 2; i < result.length; i++) {
-    var child = result[i];
-
-    if (child.length >= 4) childparts.push(serialise_result(child));
-  }
-
-  childparts = childparts.sort(function (a, b) {
-    return fullsize(b) - fullsize(a);
-  });
-
-  var parts = [];
-  for (var i = 0; i < childparts.length; i++) {
-    parts = parts.concat(childparts[i]);
-  }
-
-  var sliced = result.slice(2).map(function (l) {
-    return l[0];
-  });
-  var thispart = [result[0], result[1]].concat(sliced);
-
-  return parts.concat([thispart]);
-}
-
-function stringify_result(serialised, target) {
-  var output = "";
-
-  serialised = serialised.slice(0);
-
-  for (var i = 0; i < serialised.length; i++) {
-    var x = serialised[i];
-
-    var args = x.slice(2);
-    output += args.join(" " + x[1] + " ") + " = " + x[0] + "\n";
-  }
-
-  var result = serialised[serialised.length - 1][0];
-  if (result != target)
-    output += "(off by " + Math.abs(result - target) + ")\n";
-
-  return output;
-}
-
-function fullsize(array) {
-  if (array.constructor != Array) return 0;
-
-  var l = 0;
-
-  for (var i = 0; i < array.length; i++) l += fullsize(array[i]);
-
-  return l + array.length;
-}
-
-function updateAnswerButton() {
-  const solution = findSolution(numbers, target);
-  let answerText = "";
-
-  if (solution !== null) {
-    answerText = "TAM ÇÖZÜM\n" + formatSolution(solution);
-  } else {
-    const approximateSolution = findApproximateSolution(numbers, target);
-    if (approximateSolution <= 1) {
-      answerText =
-        "TAM ÇÖZÜM YOK, 1 YAKLAŞIK ÇÖZÜM\n" +
-        formatApproximateSolutions(numbers, target, 1);
-    } else if (approximateSolution <= 2) {
-      answerText =
-        "TAM ÇÖZÜM YOK, 2 YAKLAŞIK ÇÖZÜM\n" +
-        formatApproximateSolutions(numbers, target, 2);
-    } else if (approximateSolution <= 3) {
-      answerText =
-        "TAM ÇÖZÜM YOK, 3 YAKLAŞIK ÇÖZÜM\n" +
-        formatApproximateSolutions(numbers, target, 3);
-    } else {
-      answerText = "ÇÖZÜM BULUNAMADI";
+    
+    /* Olası kelimeler bölümü */
+    .possible-words {
+      max-height: none; /* Kaydırma çubuğu olmasın */
+      background-color: rgba(0, 0, 0, 0.2);
+      border-radius: 5px;
+      padding: 10px;
     }
-  }
-
-  answerButton.textContent = answerText;
-}
-
-function formatSolution(solution) {
-  return (
-    solution
-      .map(
-        (step) =>
-          `${formatNumber(step.left)} ${step.op} ${formatNumber(
-            step.right
-          )} = ${formatNumber(step.result)}`
-      )
-      .join("\n") + "\n"
-  );
-}
-
-function formatNumber(num) {
-  return Number.isInteger(num) ? num.toString() : num.toFixed(2);
-}
-
-function formatApproximateSolutions(numbers, target, range) {
-  const solutions = [];
-
-  function tryOperations(nums, current = nums[0], steps = []) {
-    if (nums.length === 1) {
-      if (Number.isInteger(current) && Math.abs(current - target) <= range) {
-        solutions.push({ result: current, steps: steps });
-      }
-      return;
+    
+    /* Kelime grupları için daha kompakt stil */
+    .word-group {
+      margin-bottom: 8px;
+      padding: 6px 8px;
+      background-color: rgba(0, 51, 102, 0.4);
+      border-radius: 5px;
     }
-
-    for (let i = 1; i < nums.length; i++) {
-      for (const op of ["+", "-", "*"]) {
-        const newCurrent = calculate(current, nums[i], op);
-        if (Number.isInteger(newCurrent)) {
-          const remaining = nums.filter((_, index) => index !== i);
-          tryOperations(remaining, newCurrent, [
-            ...steps,
-            { left: current, right: nums[i], op: op, result: newCurrent },
-          ]);
-        }
-      }
-      if (nums[i] !== 0 && current % nums[i] === 0) {
-        const newCurrent = current / nums[i];
-        const remaining = nums.filter((_, index) => index !== i);
-        tryOperations(remaining, newCurrent, [
-          ...steps,
-          { left: current, right: nums[i], op: "/", result: newCurrent },
-        ]);
-      }
+    
+    .word-group:last-child {
+      margin-bottom: 0;
     }
-  }
-
-  tryOperations(numbers);
-
-  return solutions
-    .map((sol) => {
-      const difference = sol.result - target;
-      const formattedDifference =
-        difference > 0 ? `+${difference}` : `${difference}`;
-      const stepsFormatted = sol.steps
-        .map((step) => `${step.left} ${step.op} ${step.right} = ${step.result}`)
-        .join("\n");
-      return `${target}${formattedDifference}:\n${stepsFormatted}`;
-    })
-    .join("\n\n");
-}
-
-function solve_numbers(numbers, target, trickshot) {
-  numbers.sort();
-  bestresult = [numbers[0], numbers[0]];
-
-  if (!trickshot) {
-    for (var i = 1; i < numbers.length; i++) {
-      if (Math.abs(numbers[i] - target) < Math.abs(bestresult[0] - target)) {
-        bestresult = [numbers[i], numbers[i]];
-        bestvalsums = numbers[i];
-      }
+    
+    .word-group h4 {
+      color: #0099cc;
+      margin: 0 0 3px 0;
+      font-size: 15px;
     }
-    if (bestresult[0] == target) return target + " = " + target;
-  }
-
-  allresults = [];
-  _solve_numbers(numbers, target, trickshot);
-
-  allresults.sort(function (a, b) {
-    return a.valsums - b.valsums;
-  });
-
-  var s = "";
-  var got = {};
-  for (var i = 0; i < allresults.length; i++) {
-    var this_str =
-      stringify_result(
-        serialise_result(tidyup_result(allresults[i].answer)),
-        target
-      ) + "\n\n";
-    if (!got[this_str]) {
-      got[this_str] = true;
-      s += this_str;
+    
+    .word-group p {
+      margin: 0;
+      line-height: 1.4;
+      word-wrap: break-word;
     }
-  }
-  return s;
-}
-
-function _solve_numbers(numbers, target, trickshot) {
-  numbers = numbers.map(function (x) {
-    return [x, false];
-  });
-
-  var was_generated = [];
-  for (var i = 0; i < numbers.length; i++) was_generated.push(false);
-
-  bestresult = [0, 0];
-
-  _recurse_solve_numbers(
-    numbers,
-    0,
-    was_generated,
-    target,
-    numbers.length,
-    0,
-    trickshot
-  );
-
-  return bestresult;
-}
-
-function _recurse_solve_numbers(
-  numbers,
-  searchedi,
-  was_generated,
-  target,
-  levels,
-  valsums,
-  trickshot
-) {
-  levels--;
-
-  for (var i = 0; i < numbers.length - 1; i++) {
-    var ni = numbers[i];
-
-    if (ni === false) continue;
-
-    numbers[i] = false;
-
-    for (var j = i + 1; j < numbers.length; j++) {
-      var nj = numbers[j];
-
-      if (nj === false) continue;
-
-      if (i < searchedi && !was_generated[i] && !was_generated[j]) continue;
-
-      for (var o in OPS) {
-        var r = OPS[o](ni[0], nj[0]);
-        if (r === false) continue;
-
-        if (o == "/" && nj[0] == 1) continue;
-        if (o == "?" && ni[0] == 1) continue;
-        if (o == "*" && (ni[0] == 1 || nj[0] == 1)) continue;
-        if (r == ni[0] || r == nj[0]) continue;
-
-        var op_cost = Math.abs(r);
-        while (op_cost % 10 == 0 && op_cost != 0) op_cost /= 10;
-        if ((ni[0] == 10 || nj[0] == 10) && o == "*") op_cost = 1;
-        op_cost *= OPCOST[o];
-
-        var newvalsums = valsums + op_cost;
-
-        if (
-          allresults.length == 0 ||
-          Math.abs(r - target) < Math.abs(allresults[0].answer[0] - target)
-        )
-          allresults = [];
-        if (
-          allresults.length == 0 ||
-          Math.abs(r - target) <= Math.abs(allresults[0].answer[0] - target)
-        )
-          allresults.push(
-            JSON.parse(
-              JSON.stringify({ valsums: valsums, answer: [r, o, ni, nj] })
-            )
-          );
-
-        if (
-          Math.abs(r - target) < Math.abs(bestresult[0] - target) ||
-          (Math.abs(r - target) == Math.abs(bestresult[0] - target) &&
-            (trickshot || newvalsums < bestvalsums))
-        ) {
-          bestresult = [r, o, ni, nj];
-          bestvalsums = newvalsums;
-        }
-
-        numbers[j] = [r, o, ni, nj];
-        var old_was_gen = was_generated[j];
-        was_generated[j] = true;
-
-        if (levels > 0)
-          _recurse_solve_numbers(
-            numbers,
-            i + 1,
-            was_generated,
-            target,
-            levels,
-            newvalsums,
-            trickshot
-          );
-
-        was_generated[j] = old_was_gen;
-        numbers[j] = nj;
-      }
+    
+    /* En iyi çözümler için stil */
+    .best-answer {
+      font-size: 16px;
+      margin: 8px 0;
+      padding: 8px 10px;
+      background-color: rgba(0, 204, 102, 0.1);
+      border-radius: 5px;
     }
-
-    numbers[i] = ni;
-  }
-}
-
-function _solve_numbers(numbers, target, trickshot) {
-  numbers = numbers.map(function (x) {
-    return [x, false];
-  });
-
-  var was_generated = [];
-  for (var i = 0; i < numbers.length; i++) was_generated.push(false);
-
-  bestresult = [0, 0];
-
-  _recurse_solve_numbers(
-    numbers,
-    0,
-    was_generated,
-    target,
-    numbers.length,
-    0,
-    trickshot
-  );
-
-  return bestresult;
-}
-
-function solve_numbers(numbers, target, trickshot) {
-  numbers.sort();
-  bestresult = [numbers[0], numbers[0]];
-
-  if (!trickshot) {
-    for (var i = 1; i < numbers.length; i++) {
-      if (Math.abs(numbers[i] - target) < Math.abs(bestresult[0] - target)) {
-        bestresult = [numbers[i], numbers[i]];
-        bestvalsums = numbers[i];
-      }
+    
+    .best-answer strong {
+      color: #00cc66;
+      font-size: 18px;
     }
-    if (bestresult[0] == target) return target + " = " + target;
-  }
-
-  allresults = [];
-  _solve_numbers(numbers, target, trickshot);
-
-  allresults.sort(function (a, b) {
-    return a.valsums - b.valsums;
-  });
-
-  var s = "";
-  var got = {};
-  for (var i = 0; i < allresults.length; i++) {
-    var this_str =
-      stringify_result(
-        serialise_result(tidyup_result(allresults[i].answer)),
-        target
-      ) + "\n\n";
-    if (!got[this_str]) {
-      got[this_str] = true;
-      s += this_str;
+    
+    /* Joker harfleri için daha belirgin vurgu */
+    .joker-letter {
+      color: #ff9900;
+      font-weight: bold;
+      background-color: rgba(255, 153, 0, 0.2);
+      padding: 0 3px;
+      border-radius: 3px;
     }
-  }
-  return s;
-}
+  `,document.getElementById("fixed-word-results-styles"));t&&t.remove(),document.head.appendChild(e)}function setupGameButtons(){var e,t=document.getElementById("homeButton"),n=document.getElementById("playAgainButton");let a=document.getElementById("pauseButton");t&&(e=t.cloneNode(!0),t.parentNode.replaceChild(e,t),e.addEventListener("click",()=>{isPaused&&(isPaused=!1,a)&&(a.innerHTML='<i class="fas fa-pause"></i>',a.title="Duraklat",a.classList.remove("play-active"));var e=document.getElementById("paused-overlay");e&&(e.style.display="none"),isGameStarting||goToHomePage()})),n&&(t=n.cloneNode(!0),n.parentNode.replaceChild(t,n),t.addEventListener("click",()=>{var e;isPaused&&(isPaused=!1,a&&(a.innerHTML='<i class="fas fa-pause"></i>',a.title="Duraklat",a.classList.remove("play-active")),e=document.getElementById("paused-overlay"))&&(e.style.display="none"),isGameStarting||restartGame()}))}function endGame(e=!0,t=!1){(isGameActive||isGameStarting)&&(isGameActive=!1,clearAllTimers(),clearTimeout(startTimerTimeout),timerElement&&(timerElement.style.color=t?"#00cc66":"#ff3300"),stopCountdownMusic(),updateButtonStates(),t&&showNotification("Tebrikler! Mükemmel bir sonuç!","success"),e)&&setTimeout(()=>{answerButton&&(answerButton.innerHTML='<i class="fas fa-eye-slash"></i> CEVABI GİZLE'),displayAnswers()},t?1500:500)}function confirmAnswer(){var e=document.getElementById("confirmation-modal");e&&(e.style.display="none"),endGame(!0)}async function fillWordAnswers(e){let t=Array.from(document.querySelectorAll(".letter-box")).map(e=>e.textContent);var n=await findLongestWord(t,!1),a=await findLongestWord(t,!0),i=await findAllPossibleWords(t,3,!0);e.innerHTML=`
+    <h3 style="color: #ffcc00; margin-top: 0; margin-bottom: 10px;">En İyi Çözümler</h3>
+    
+    <div style="background-color: rgba(0, 0, 0, 0.2); border-radius: 5px; padding: 10px; margin-bottom: 15px;">
+      <div style="margin-bottom: 8px;">
+        <strong>En uzun kelime (jokersiz):</strong> 
+        <span style="color: #00cc66; font-size: 18px; font-weight: bold;">${highlightJoker(n,t)}</span>
+      </div>
+      
+      <div>
+        <strong>En uzun kelime (jokerli):</strong> 
+        <span style="color: #00cc66; font-size: 18px; font-weight: bold;">${highlightJoker(a,t)}</span>
+      </div>
+    </div>
+    
+    ${0<i.length?`
+    <h3 style="color: #ffcc00; margin-top: 15px; margin-bottom: 10px;">Diğer Olası ${i[0].length} Harfli Kelimeler</h3>
+    
+    <div style="background-color: rgba(0, 0, 0, 0.2); border-radius: 5px; padding: 10px;">
+      <p style="margin: 0; line-height: 1.4;">
+        ${i.map(e=>highlightJoker(e,t)).join(", ")}
+      </p>
+    </div>
+    `:""}
+  `}function fillMathAnswers(e){var t=solve_numbers(currentNumbers,currentTarget,!1);0<(allResults=t.split("\n\n").filter(e=>""!==e.trim())).length?(displayResults(),createPagination()):e.textContent="Çözüm bulunamadı."}function setupNotificationSystem(){notificationSystem.clearAllNotifications(),notificationSystem.init()}function togglePause(){var e,t=document.getElementById("pauseButton");t&&(!isGameActive||isGameStarting?console.log("Oyun aktif değil veya başlatılıyor, duraklama işlemi iptal edildi"):(isPaused=!isPaused)?(t.innerHTML='<i class="fas fa-play"></i>',t.title="Devam Et",t.classList.add("play-active"),blurGameArea(!0),(e=document.getElementById("countdownMusic"))&&countdownMusicPlaying&&e.pause(),notificationSystem.init(),notificationSystem.show("Oyun duraklatıldı! Devam etmek için play butonuna basın.","info",3e3)):(t.innerHTML='<i class="fas fa-pause"></i>',t.title="Duraklat",t.classList.remove("play-active"),timerElement&&(timerElement.style.display="block"),blurGameArea(!1),soundEnabled&&resumeCountdownMusic(),notificationSystem.init(),notificationSystem.show("Oyun devam ediyor!","info",1500)))}document.addEventListener("DOMContentLoaded",()=>{addFixedWordStyles()}),"complete"!==document.readyState&&"interactive"!==document.readyState||addFixedWordStyles();

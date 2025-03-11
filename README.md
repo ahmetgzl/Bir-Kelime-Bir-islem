@@ -1,34 +1,44 @@
-# Bir Kelime Bir İşlem
+# Bir Kelime Bir İşlem (v0.9)
 
-This is a web-based implementation of the popular Turkish game show "Bir Kelime Bir İşlem" (Countdown TV Game Show). The game consists of two parts: a word game and a math game.
+Bu uygulama, popüler Türk televizyon yarışması "Bir Kelime Bir İşlem"in web tabanlı bir uygulamasıdır. Oyun iki bölümden oluşur: kelime oyunu ve işlem (matematik) oyunu.
 
-## Features
+## Yenilikler (v0.9)
+- Kelime ve işlem oyunları için kullanıcı giriş alanları eklendi
+- Oyun müziği ve ses efektleri eklendi
+- Geliştirilmiş bildirim sistemi
+- Oyun duraklatma özelliği
+- Geliştirilmiş ipucu sistemi
+- Türkçe kelime listesi genişletildi ve güncellendi
+- Kelime bulma algoritması iyileştirildi
+- Matematik işlemleri için kullanıcı dostu arayüz
 
-- Two game modes: Word and Math
-- Timer functionality
-- Hint and Answer features
-- Responsive design
-- Animated letter/number reveals
+## Özellikler
 
-## How to Play
+- İki oyun modu: Kelime ve İşlem (Matematik)
+- Zamanlayıcı işlevi
+- İpucu ve Cevap özellikleri
+- Duyarlı tasarım
+- Animasyonlu harf/sayı gösterimi
 
-### Word Game
-- 9 random letters are generated (including at least 3 vowels)
-- Players have 30 seconds to find the longest word possible using the given letters
-- One letter can be used as a joker (wild card)
+## Nasıl Oynanır
 
-### Math Game
-- 6 random numbers are generated (4 small numbers 1-10, 2 large numbers 25, 50, 75, or 100)
-- A random 3-digit target number is generated
-- Players have 30 seconds to use the given numbers and basic arithmetic operations to reach the target number or get as close as possible
+### Kelime Oyunu
+- 9 rastgele harf oluşturulur (en az 3 sesli harf içerir)
+- Oyuncuların verilen harfleri kullanarak mümkün olan en uzun kelimeyi bulmaları için 30 saniyesi vardır
+- Bir harf joker (değiştirilebilir) olarak kullanılabilir
 
-## Technical Details
+### Matematik Oyunu
+- 6 rastgele sayı oluşturulur (4 küçük sayı 1-10 arasında, 2 büyük sayı 25, 50, 75 veya 100)
+- Rastgele bir 3 basamaklı hedef sayı oluşturulur
+- Oyuncuların verilen sayıları ve temel aritmetik işlemleri kullanarak hedef sayıya ulaşmaları veya mümkün olduğunca yaklaşmaları için 30 saniyesi vardır
 
-- Built with HTML, CSS, and JavaScript
-- Developer with the assistance of AI
+## Teknik Detaylar
+
+- HTML, CSS ve JavaScript ile oluşturulmuştur
+- Yapay Zeka desteğiyle geliştirilmiştir
 
 ## Credits
 
-- Game concept inspired by the Turkish TV show "Bir Kelime Bir İşlem"
-- Word list sourced from [Kelimetre](https://www.kelimetre.com/)
-- Math solving algorithm developed with the assistance of [Claude](https://claude.ai/), an AI assistant created by Anthropic
+- Oyun konsepti Türk TV şovu "Bir Kelime Bir İşlem"den esinlenmiştir
+- Kelime listesi [Kelimetre](https://www.kelimetre.com/)'den alınmıştır
+- Matematik çözüm algoritması, Anthropic tarafından oluşturulan bir yapay zeka asistanı olan [Claude](https://claude.ai/) yardımıyla geliştirilmiştir
