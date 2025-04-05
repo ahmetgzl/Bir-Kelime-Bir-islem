@@ -163,7 +163,7 @@ document.addEventListener('DOMContentLoaded', function () {
       
       /* Pause durumunda overlay altında kalmasın */
       #paused-overlay {
-        z-index: 999;
+        z-index: 9000;
       }
     `;
     document.head.appendChild(style);
@@ -187,7 +187,6 @@ document.addEventListener('DOMContentLoaded', function () {
   setupModalButtons(); // Modal butonlarını bir kez ayarla
   addPlayButtonStyles();
   addStylesForMathInput();
-  addSoundControlStyles();
 
   // Ses seviyesini ayarla
   if (countdownMusic) {
@@ -370,9 +369,7 @@ document.addEventListener('DOMContentLoaded', function () {
       answerArea.style.display = "block";
       
       // Buton metnini güncelle
-      if (answerButton) {
-        answerButton.textContent = "CEVABI GİZLE";
-      }
+      if (answerButton) answerButton.innerHTML = '<i class="fas fa-eye-slash"></i> CEVABI GİZLE';
     });
   }
   
@@ -519,14 +516,14 @@ function toggleAnswerDisplay() {
     
     // Göster
     answerArea.style.display = "block";
-    if (answerButton) answerButton.textContent = "CEVABI GİZLE";
+    if (answerButton) answerButton.innerHTML = '<i class="fas fa-eye-slash"></i> CEVABI GİZLE';
   } 
   // Eğer cevap alanı varsa, görünürlüğü tersine çevir
   else {
     // Şu anda görünür ise gizle
     if (answerArea.style.display === "block") {
       answerArea.style.display = "none";
-      if (answerButton) answerButton.textContent = "CEVAP";
+      if (answerButton) answerButton.innerHTML = '<i class="fas fa-eye"></i> CEVAP';
       
       // Sayfalama alanını da gizle
       const paginationArea = document.getElementById("pagination-area");
@@ -543,7 +540,7 @@ function toggleAnswerDisplay() {
       
       // Göster
       answerArea.style.display = "block";
-      if (answerButton) answerButton.textContent = "CEVABI GİZLE";
+      if (answerButton) answerButton.innerHTML = '<i class="fas fa-eye-slash"></i> CEVABI GİZLE';
       
       // Sayfalama alanını da göster
       const paginationArea = document.getElementById("pagination-area");
@@ -1934,7 +1931,7 @@ function startGame(type) {
 
   if (timerElement) {
     timerElement.textContent = timeLeft;
-    timerElement.style.display = "block";
+    timerElement.style.display = "flex";
     timerElement.style.color = "";
   }
 
@@ -2340,9 +2337,7 @@ function startTimer() {
 // YENİ: Cevap butonunu ve cevap gösterme alanını sıfırlayan fonksiyon
 function resetAnswerButton() {
   // Cevap butonu metnini sıfırla
-  if (answerButton) {
-    answerButton.textContent = "CEVAP";
-  }
+  if (answerButton) answerButton.innerHTML = '<i class="fas fa-eye"></i> CEVAP';
   
   // Cevap alanını kaldır
   const answerArea = document.getElementById("answer-area");
@@ -4043,7 +4038,7 @@ function endGame(showAnswerImmediately = true, userWon = false) {
   if (showAnswerImmediately) {
     setTimeout(() => {
       // Cevap butonunun metnini güncelle ve cevabı göster
-      if (answerButton) answerButton.textContent = "CEVABI GİZLE";
+      if (answerButton) answerButton.innerHTML = '<i class="fas fa-eye-slash"></i> CEVABI GİZLE';
       displayAnswers();
     }, userWon ? 1500 : 500); // Kazandıysa biraz daha beklet, bildirimler görünsün
   }
@@ -4176,96 +4171,4 @@ function togglePause() {
     notificationSystem.init();
     notificationSystem.show('Oyun devam ediyor!', 'info', 1500);
   }
-}
-
-function addSoundControlStyles() {
-  // Mevcut stil varsa kaldır
-  const existingStyle = document.getElementById('sound-control-fixed-styles');
-  if (existingStyle) {
-    existingStyle.remove();
-  }
-  
-  // Yeni stil oluştur
-  const style = document.createElement('style');
-  style.id = 'sound-control-fixed-styles';
-  style.textContent = `
-    .sound-controls {
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      z-index: 999;
-      pointer-events: auto;
-    }
-    
-    .sound-button {
-      width: 40px;
-      height: 40px;
-      background-color: rgba(0, 51, 102, 0.8);
-      color: #ff9900;
-      border: none;
-      border-radius: 50%;
-      cursor: pointer;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      font-size: 18px;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-      transition: all 0.2s ease;
-      pointer-events: auto;
-    }
-    
-    .sound-button:hover {
-      background-color: rgba(0, 51, 102, 1);
-      transform: scale(1.05);
-    }
-    
-    .volume-control {
-      background-color: rgba(0, 51, 102, 0.9);
-      padding: 8px 12px;
-      border-radius: 20px;
-      margin-top: 8px;
-      display: flex;
-      align-items: center;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-      transition: all 0.3s ease;
-      max-width: 0;
-      overflow: hidden;
-      opacity: 0;
-      pointer-events: auto;
-    }
-    
-    .volume-control.active {
-      max-width: 150px;
-      opacity: 1;
-      border: 1px solid rgba(255, 153, 0, 0.3);
-    }
-    
-    .volume-slider {
-      width: 80px;
-      height: 8px;
-      border-radius: 4px;
-      background: #004080;
-      outline: none;
-      margin-right: 10px;
-      pointer-events: auto;
-    }
-    
-    .volume-percentage {
-      color: #ff9900;
-      font-size: 12px;
-      min-width: 35px;
-      font-weight: bold;
-    }
-    
-    /* Ekranın üstünde sabit pozisyonda durur */
-    .container {
-      position: relative;
-    }
-  `;
-  
-  // Stili sayfaya ekle
-  document.head.appendChild(style);
 }
